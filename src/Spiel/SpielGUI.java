@@ -6,6 +6,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.util.ArrayList;
+import java.util.List;
 
 public class SpielGUI extends JPanel implements ActionListener {
 
@@ -19,6 +21,7 @@ public class SpielGUI extends JPanel implements ActionListener {
     private boolean isPromoting = false;
     private int promotionZeile = -1;
     private int promotionSpalte = -1;
+    private List<int[]> moeglicheZuege = new ArrayList<>();
 
     private Figur ausgewaehlteFigur;
     private int vonZeile = -1;
@@ -92,7 +95,25 @@ public class SpielGUI extends JPanel implements ActionListener {
 
         for (int zeile = 8 - 1; zeile >= 0; zeile--) {
             for (int spalte = 0; spalte < 8; spalte++) {
-                felder[zeile][spalte] = new JButton();
+                final int z = zeile;
+                final int s = spalte;
+                felder[zeile][spalte] = new JButton() {
+                    @Override
+                    protected void paintComponent(Graphics g) {
+                        super.paintComponent(g);
+                        for (int[] zug : moeglicheZuege) {
+                            if (zug[0] == z && zug[1] == s) {
+                                Graphics2D g2 = (Graphics2D) g.create();
+                                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                                g2.setColor(new Color(100, 100, 100, 100));
+                                int d = getWidth() / 4;
+                                g2.fillOval((getWidth() - d) / 2, (getHeight() - d) / 2, d, d);
+                                g2.dispose();
+                                break;
+                            }
+                        }
+                    }
+                };
                 felder[zeile][spalte].setMargin(new Insets(0, 0, 0, 0));
                 felder[zeile][spalte].setFont(new Font("SansSerif", Font.PLAIN, 20));
                 felder[zeile][spalte].setFocusPainted(false); // Entfernt den Rahmen beim Anklicken
@@ -128,7 +149,7 @@ public class SpielGUI extends JPanel implements ActionListener {
                 
                 boardLayeredPane.revalidate();
 
-                int fontSize = (int) ((minSize / 0.8) * 0.6); // Faktor weiter verringert
+                int fontSize = (int) ((minSize / 8.0) * 0.6); // Faktor weiter verringert
                 Font font = new Font("SansSerif", Font.PLAIN, Math.max(1, fontSize));
 
                 for (int zeile = 0; zeile < 8; zeile++) {
@@ -155,6 +176,11 @@ public class SpielGUI extends JPanel implements ActionListener {
                     felder[zeile][spalte].setText(getFigurSymbol(figur));
                 } else {
                     felder[zeile][spalte].setText("");
+                }
+                if ((zeile + spalte) % 2 == 0) {
+                    felder[zeile][spalte].setBackground(Color.LIGHT_GRAY);
+                } else {
+                    felder[zeile][spalte].setBackground(Color.WHITE);
                 }
             }
         }
@@ -187,8 +213,6 @@ public class SpielGUI extends JPanel implements ActionListener {
         for (int zeile = 0; zeile < 8; zeile++) {
             for (int spalte = 0; spalte < 8; spalte++) {
                 if (source == felder[zeile][spalte]) {
-                    //temporär
-                    //System.out.println(brett.istFeldBedroht(zeile, spalte, amZug));
                     if (ausgewaehlteFigur == null) {
                         Figur figur = brett.getFigur(zeile, spalte);
                         if (figur != null && figur.getFarbe() == amZug) {
@@ -196,31 +220,31 @@ public class SpielGUI extends JPanel implements ActionListener {
                             vonZeile = zeile;
                             vonSpalte = spalte;
                             felder[zeile][spalte].setBackground(Color.YELLOW);
+                            moeglicheZuege = brett.getLegaleZuege(zeile, spalte);
+                            brettPanel.repaint();
                         }
                     } else {
                         if (brett.istZugGueltig(vonZeile, vonSpalte, zeile, spalte)) {
-                            // Prüfen, ob es sich um eine Bauernumwandlung handelt
+                            // Bauernumwandlung?
                             boolean istBauer = ausgewaehlteFigur instanceof Bauer;
-                            // Weiß startet bei 1 und läuft zu 7. Schwarz startet bei 6 und läuft zu 0.
                             boolean zielIstEndreihe = (zeile == 0 || zeile == 7);
 
                             brett.bewegeFigur(vonZeile, vonSpalte, zeile, spalte);
 
                             if (istBauer && zielIstEndreihe) {
-                                // Auswahl anzeigen und Zugwechsel pausieren
                                 isPromoting = true;
-                                
-                                // Visuelles Feedback zurücksetzen (da wir hier returnen)
+
                                 if ((vonZeile + vonSpalte) % 2 == 0) {
                                     felder[vonZeile][vonSpalte].setBackground(Color.LIGHT_GRAY);
                                 } else {
                                     felder[vonZeile][vonSpalte].setBackground(Color.WHITE);
                                 }
+                                moeglicheZuege.clear();
                                 ausgewaehlteFigur = null;
                                 aktualisiereBrett();
                                 
                                 zeigePromotionAuswahl(zeile, spalte);
-                                return; // WICHTIG: Hier abbrechen und auf Button-Klick warten
+                                return;
                             }
 
                             amZug = (amZug == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS;
@@ -231,7 +255,9 @@ public class SpielGUI extends JPanel implements ActionListener {
                         } else {
                             felder[vonZeile][vonSpalte].setBackground(Color.WHITE);
                         }
+                        moeglicheZuege.clear();
                         aktualisiereBrett();
+                        brettPanel.repaint();
                     }
                     return;
                 }

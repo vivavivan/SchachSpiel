@@ -555,6 +555,63 @@ public class Brett {
         }
     }
 
+    public ArrayList<int[]> getLegaleZuege(int zeile, int spalte) {
+        Figur figur = getFigur(zeile, spalte);
+        if (figur == null) return new ArrayList<>();
+
+        ArrayList<int[]> moeglicheFelder = new ArrayList<>();
+
+        if (figur instanceof Bauer) {
+            int richtung = (figur.getFarbe() == Figur.Farbe.WEISS) ? 1 : -1;
+            pruefenUndHinzufuegen(zeile, spalte, zeile + richtung, spalte, moeglicheFelder);
+            pruefenUndHinzufuegen(zeile, spalte, zeile + 2 * richtung, spalte, moeglicheFelder);
+            pruefenUndHinzufuegen(zeile, spalte, zeile + richtung, spalte - 1, moeglicheFelder);
+            pruefenUndHinzufuegen(zeile, spalte, zeile + richtung, spalte + 1, moeglicheFelder);
+        } else if (figur instanceof Turm) {
+            scanRichtungen(zeile, spalte, new int[][]{{0, 1}, {0, -1}, {1, 0}, {-1, 0}}, moeglicheFelder);
+        } else if (figur instanceof Springer) {
+            int[][] spruenge = {{-2, -1}, {-2, 1}, {-1, -2}, {-1, 2}, {1, -2}, {1, 2}, {2, -1}, {2, 1}};
+            for (int[] s : spruenge) {
+                pruefenUndHinzufuegen(zeile, spalte, zeile + s[0], spalte + s[1], moeglicheFelder);
+            }
+        } else if (figur instanceof Laeufer) {
+            scanRichtungen(zeile, spalte, new int[][]{{1, 1}, {1, -1}, {-1, 1}, {-1, -1}}, moeglicheFelder);
+        } else if (figur instanceof Koenigin) {
+            scanRichtungen(zeile, spalte, new int[][]{{0, 1}, {0, -1}, {1, 0}, {-1, 0}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}}, moeglicheFelder);
+        } else if (figur instanceof Koenig) {
+            for (int i = -1; i <= 1; i++) {
+                for (int j = -1; j <= 1; j++) {
+                    if (!(i == 0 && j == 0)) {
+                        pruefenUndHinzufuegen(zeile, spalte, zeile + i, spalte + j, moeglicheFelder);
+                    }
+                }
+            }
+            pruefenUndHinzufuegen(zeile, spalte, zeile, spalte + 2, moeglicheFelder);
+            pruefenUndHinzufuegen(zeile, spalte, zeile, spalte - 2, moeglicheFelder);
+        }
+        return moeglicheFelder;
+    }
+
+    private void scanRichtungen(int zeile, int spalte, int[][] richtungen, ArrayList<int[]> liste) {
+        for (int[] r : richtungen) {
+            for (int i = 1; i < 8; i++) {
+                int nachZeile = zeile + i * r[0];
+                int nachSpalte = spalte + i * r[1];
+                if (!istImBrett(nachZeile, nachSpalte)) break;
+                if (istZugGueltig(zeile, spalte, nachZeile, nachSpalte)) {
+                    liste.add(new int[]{nachZeile, nachSpalte});
+                }
+                if (getFigur(nachZeile, nachSpalte) != null) break;
+            }
+        }
+    }
+
+    private void pruefenUndHinzufuegen(int vonZeile, int vonSpalte, int nachZeile, int nachSpalte, ArrayList<int[]> liste) {
+        if (istZugGueltig(vonZeile, vonSpalte, nachZeile, nachSpalte)) {
+            liste.add(new int[]{nachZeile, nachSpalte});
+        }
+    }
+
     private void initialisiereBrett() {
         weisseFiguren.clear();
         schwarzeFiguren.clear();
