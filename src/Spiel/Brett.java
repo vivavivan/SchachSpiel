@@ -27,10 +27,14 @@ public class Brett {
 
 
     public void bewegeFigur(int vonZeile, int vonSpalte, int nachZeile, int nachSpalte) {
-        bewegeFigur(felder, vonZeile, vonSpalte, nachZeile, nachSpalte);
+        bewegeFigur(felder, vonZeile, vonSpalte, nachZeile, nachSpalte, 0, 0);
     }
 
-    private void bewegeFigur(Figur[][] felder, int vonZeile, int vonSpalte, int nachZeile, int nachSpalte) {
+    public void bewegeFigur(int vonZeile, int vonSpalte, int nachZeile, int nachSpalte, int istPromotion, int promotionTyp) {
+        bewegeFigur(felder, vonZeile, vonSpalte, nachZeile, nachSpalte, istPromotion, promotionTyp);
+    }
+
+    private void bewegeFigur(Figur[][] felder, int vonZeile, int vonSpalte, int nachZeile, int nachSpalte, int istPromotion, int promotionTyp) {
         Figur figur = felder[vonZeile][vonSpalte];
         Figur.Farbe gegnerFarbe = (figur.getFarbe() == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS;
         ArrayList<Figur> gegnerFiguren = (gegnerFarbe == Figur.Farbe.WEISS) ? weisseFiguren : schwarzeFiguren;
@@ -74,6 +78,19 @@ public class Brett {
             setKoenigPos(figur.getFarbe(), nachZeile, nachSpalte);
         }
 
+        if(istPromotion == 1) {
+            if(promotionTyp == 1) {
+                promoviereBauer(nachZeile, nachSpalte, "Turm");
+            }else if (promotionTyp == 2) {
+                promoviereBauer(nachZeile, nachSpalte, "Läufer");
+            }else if (promotionTyp == 3) {
+                promoviereBauer(nachZeile, nachSpalte, "Springer");
+            }else {
+                promoviereBauer(nachZeile, nachSpalte, "Dame");
+            }
+
+        }
+
         wirdEnPassantMoeglich(figur, vonZeile, vonSpalte, nachZeile, nachSpalte);
 
         if (figur != null) figur.setHatSichBewegt(true);
@@ -96,11 +113,14 @@ public class Brett {
         figurenListe.remove(bauer);
 
         Figur neueFigur;
-        switch (neuerTyp) {
-            case "Turm": neueFigur = new Turm(farbe); break;
-            case "Springer": neueFigur = new Springer(farbe); break;
-            case "Läufer": neueFigur = new Laeufer(farbe); break;
-            default: neueFigur = new Koenigin(farbe); break; // Standard ist Dame
+        if (neuerTyp.equals("Turm")) {
+            neueFigur = new Turm(farbe);
+        } else if (neuerTyp.equals("Springer")) {
+            neueFigur = new Springer(farbe);
+        } else if (neuerTyp.equals("Läufer")) {
+            neueFigur = new Laeufer(farbe);
+        } else {
+            neueFigur = new Koenigin(farbe); // Standard ist Dame
         }
 
         // Neue Figur platzieren (nutzt deine existierende Hilfsmethode)
@@ -396,6 +416,14 @@ public class Brett {
             enPassantMoeglich = vonSpalte;
 
         }
+    }
+
+    public ArrayList<Figur> getSchwarzeFiguren() {
+        return schwarzeFiguren;
+    }
+
+    public ArrayList<Figur> getWeisseFiguren() {
+        return weisseFiguren;
     }
 
     private boolean istImBrett(int zeile, int spalte) {

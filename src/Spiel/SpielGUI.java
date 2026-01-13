@@ -34,12 +34,17 @@ public class SpielGUI extends JPanel implements ActionListener {
     private int zeitSchwarz = 600;
     private Timer gameTimer;
 
-    public SpielGUI(Runnable zurueckZumMenu, int zeitLimit) {
+    private final Spieler spielerWeiss;
+    private final Spieler spielerSchwarz;
+
+    public SpielGUI(Runnable zurueckZumMenu, int zeitLimit, Spieler spielerWeiss, Spieler spielerSchwarz) {
         super(new BorderLayout());
         this.brett = new Brett();
         
         this.zeitWeiss = zeitLimit;
         this.zeitSchwarz = zeitLimit;
+        this.spielerWeiss = spielerWeiss;
+        this.spielerSchwarz = spielerSchwarz;
 
         //Seiten-Panels erstellen
         leftPanel = new JPanel();
@@ -144,7 +149,7 @@ public class SpielGUI extends JPanel implements ActionListener {
                 brettPanel.setBounds(0, 0, minSize, minSize);
 
                 if (isPromoting) {
-                    updatePromotionPanelBounds(minSize);
+                    promoAuswahlGroesseAnpassen(minSize);
                 }
                 
                 boardLayeredPane.revalidate();
@@ -166,6 +171,9 @@ public class SpielGUI extends JPanel implements ActionListener {
 
         aktualisiereBrett();
         startTimer();
+
+        // Falls Weiß ein Bot ist, muss er direkt anfangen
+        checkAndPerformBotMove();
     }
 
     private void aktualisiereBrett() {
@@ -209,6 +217,10 @@ public class SpielGUI extends JPanel implements ActionListener {
     public void actionPerformed(ActionEvent e) {
         if (isPromoting) return;
 
+        // Wenn ein Bot am Zug ist, darf der Mensch nicht klicken
+        Spieler aktuellerSpieler = (amZug == Figur.Farbe.WEISS) ? spielerWeiss : spielerSchwarz;
+        if (aktuellerSpieler.istBot()) return;
+
         Object source = e.getSource();
         for (int zeile = 0; zeile < 8; zeile++) {
             for (int spalte = 0; spalte < 8; spalte++) {
@@ -248,6 +260,7 @@ public class SpielGUI extends JPanel implements ActionListener {
                             }
 
                             amZug = (amZug == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS;
+                            checkAndPerformBotMove(); // Prüfen, ob jetzt ein Bot dran ist
                         }
                         ausgewaehlteFigur = null;
                         if ((vonZeile + vonSpalte) % 2 == 0) {
@@ -265,7 +278,7 @@ public class SpielGUI extends JPanel implements ActionListener {
         }
     }
 
-    private void updatePromotionPanelBounds(int boardSize) {
+    private void promoAuswahlGroesseAnpassen(int boardSize) {
         Insets insets = brettPanel.getInsets();
         int availableWidth = boardSize - insets.left - insets.right;
         int availableHeight = boardSize - insets.top - insets.bottom;
@@ -311,8 +324,8 @@ public class SpielGUI extends JPanel implements ActionListener {
         // Weiß (oben): Dame, Turm, Läufer, Springer (nach unten)
         // Schwarz (unten): Springer, Läufer, Turm, Dame (nach oben, damit Dame auf dem Ziel-Feld liegt)
         boolean isWhite = (amZug == Figur.Farbe.WEISS);
-        int start = isWhite ? 0 : typen.length - 1;
-        int end = isWhite ? typen.length : -1;
+        int start = isWhite ? 0 : 3;
+        int end = isWhite ? 4 : -1;
         int step = isWhite ? 1 : -1;
 
         for (int i = start; i != end; i += step) {
@@ -330,11 +343,12 @@ public class SpielGUI extends JPanel implements ActionListener {
                 isPromoting = false; // Brett wieder freigeben
                 amZug = (amZug == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS;
                 aktualisiereBrett();
+                checkAndPerformBotMove(); // Nach Promotion könnte ein Bot dran sein
             });
             promotionPanel.add(btn);
         }
 
-        updatePromotionPanelBounds(brettPanel.getWidth());
+        promoAuswahlGroesseAnpassen(brettPanel.getWidth());
         promotionPanel.setVisible(true);
     }
 
@@ -369,5 +383,39 @@ public class SpielGUI extends JPanel implements ActionListener {
         int min = sekunden / 60;
         int sek = sekunden % 60;
         return String.format("%02d:%02d", min, sek);
+    }
+
+    private void checkAndPerformBotMove() {
+        Spieler aktuellerSpieler = (amZug == Figur.Farbe.WEISS) ? spielerWeiss : spielerSchwarz;
+
+        if (aktuellerSpieler.istBot() && aktuellerSpieler instanceof BotSpieler) {
+            BotSpieler bot = (BotSpieler) aktuellerSpieler;
+
+            // Berechnung in einem neuen Thread, damit das GUI nicht einfriert
+            new Thread(() -> {
+                try {
+                    // Kurze Verzögerung für besseres Spielgefühl
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+
+                // Bot berechnet den Zug (gibt int[] {vonZ, vonS, nachZ, nachS} zurück)
+                int[] zug = bot.berechneZug(brett);
+
+                // Zug im GUI-Thread ausführen
+                SwingUtilities.invokeLater(() -> {
+                    if (zug != null && zug.length == 6) {
+                        brett.bewegeFigur(zug[0], zug[1], zug[2], zug[3], zug[4], zug[5]);
+
+                        amZug = (amZug == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS;
+                        aktualisiereBrett();
+                        
+                        // Rekursiver Aufruf, falls Bot vs Bot
+                        checkAndPerformBotMove();
+                    }
+                });
+            }).start();
+        }
     }
 }

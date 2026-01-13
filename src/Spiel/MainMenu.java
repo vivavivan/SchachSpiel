@@ -44,9 +44,27 @@ public class MainMenu extends JFrame {
         JButton botVsBotBtn = createButton("Bot vs Bot");
         JButton einstellungenBtn = createButton("Einstellungen");
 
-        // Event-Listener für "Spieler vs Spieler" (Startet dein SpielGUI)
+        // Bot vs Spieler (Mensch ist Weiß, Bot ist Schwarz)
+        botVsSpielerBtn.addActionListener(e -> {
+            Spieler weiss = new MenschSpieler(Figur.Farbe.WEISS);
+            Spieler schwarz = new RandomBotSpieler(Figur.Farbe.SCHWARZ);
+            mainContainer.add(new SpielGUI(() -> cardLayout.show(mainContainer, "Menu"), spielZeit, weiss, schwarz), "Spiel");
+            cardLayout.show(mainContainer, "Spiel");
+        });
+
+        // Spieler vs Spieler
         spielerVsSpielerBtn.addActionListener(e -> {
-            mainContainer.add(new SpielGUI(() -> cardLayout.show(mainContainer, "Menu"), spielZeit), "Spiel");
+            Spieler weiss = new MenschSpieler(Figur.Farbe.WEISS);
+            Spieler schwarz = new MenschSpieler(Figur.Farbe.SCHWARZ);
+            mainContainer.add(new SpielGUI(() -> cardLayout.show(mainContainer, "Menu"), spielZeit, weiss, schwarz), "Spiel");
+            cardLayout.show(mainContainer, "Spiel");
+        });
+
+        // Bot vs Bot
+        botVsBotBtn.addActionListener(e -> {
+            Spieler weiss = new RandomBotSpieler(Figur.Farbe.WEISS);
+            Spieler schwarz = new RandomBotSpieler(Figur.Farbe.SCHWARZ);
+            mainContainer.add(new SpielGUI(() -> cardLayout.show(mainContainer, "Menu"), spielZeit, weiss, schwarz), "Spiel");
             cardLayout.show(mainContainer, "Spiel");
         });
 
