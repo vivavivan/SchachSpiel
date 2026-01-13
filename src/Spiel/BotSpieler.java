@@ -64,17 +64,17 @@ public abstract class BotSpieler extends Spieler{
 
     // Hilfsmethode zum Entschlüsseln der Züge
     protected int[] bitmaskZugDekodieren(int move) {
-        int zielIndex = move & 0x3F;       // Die unteren 6 Bits (111111 in binär ist 0x3F)
-        int startIndex = (move >> 6) & 0x3F; // 6 Bits nach rechts schieben, dann "isolieren"
+        int zielFeld = move & 0x3F;       // Die unteren 6 Bits (111111 in binär ist 0x3F)
+        int startFeld = (move >> 6) & 0x3F; // 6 Bits nach rechts schieben, dann "isolieren"
 
         // Bei Bauernumwandlung
         int istPromotion = (move >> 12) & 1;
         int promoTypIndex = (move >> 13) & 3;
 
-        int vonZeile = startIndex >> 3;    // Sozusagen durch 8 teilen
-        int vonSpalte = startIndex & 7;    // Sozusagen modulo 8
-        int nachZeile = zielIndex >> 3;
-        int nachSpalte = zielIndex & 7;
+        int vonZeile = startFeld >> 3;    // Sozusagen durch 8 teilen
+        int vonSpalte = startFeld & 7;    // Sozusagen modulo 8
+        int nachZeile = zielFeld >> 3;
+        int nachSpalte = zielFeld & 7;
 
         return new int[]{vonZeile, vonSpalte, nachZeile, nachSpalte, istPromotion, promoTypIndex};
     }

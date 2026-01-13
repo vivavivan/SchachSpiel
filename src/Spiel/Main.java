@@ -1,9 +1,11 @@
 package Spiel;
 
-import javax.swing.SwingUtilities;
+import com.formdev.flatlaf.themes.FlatMacLightLaf;
+import javax.swing.*;
 
 public class Main {
     public static void main(String[] args) {
+        FlatMacLightLaf.setup();
         SwingUtilities.invokeLater(() -> new MainMenu().setVisible(true));
     }
 }

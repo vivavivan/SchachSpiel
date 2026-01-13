@@ -6,6 +6,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,6 +24,8 @@ public class SpielGUI extends JPanel implements ActionListener {
     private int promotionZeile = -1;
     private int promotionSpalte = -1;
     private List<int[]> moeglicheZuege = new ArrayList<>();
+    private boolean spielBeendet = false;
+    private JLabel statusLabel;
 
     private Figur ausgewaehlteFigur;
     private int vonZeile = -1;
@@ -46,11 +50,13 @@ public class SpielGUI extends JPanel implements ActionListener {
         this.spielerWeiss = spielerWeiss;
         this.spielerSchwarz = spielerSchwarz;
 
+        // Das eigentliche Schachbrett
+        brettPanel = new JPanel(new GridLayout(8, 8));
+
         //Seiten-Panels erstellen
-        leftPanel = new JPanel();
+        leftPanel = new JPanel(new BorderLayout());
         leftPanel.setPreferredSize(new Dimension(180, 0));
         leftPanel.setBackground(Color.LIGHT_GRAY);
-        leftPanel.setLayout(new FlowLayout(FlowLayout.LEFT)); 
 
         rightPanel = new JPanel();
         rightPanel.setPreferredSize(new Dimension(180, 0));
@@ -68,7 +74,7 @@ public class SpielGUI extends JPanel implements ActionListener {
         menuContainer.setOpaque(false);
 
         // Menü-Button (Hamburger-Icon)
-        JButton menuBtn = new JButton("\u2630");
+        JButton menuBtn = new JButton("\u2190");
         menuBtn.setFont(new Font("SansSerif", Font.PLAIN, 24));
         menuBtn.setFocusPainted(false);
         menuBtn.setMargin(new Insets(5, 5, 5, 5));
@@ -77,8 +83,63 @@ public class SpielGUI extends JPanel implements ActionListener {
             zurueckZumMenu.run();
         });
 
+        // Undo-Button
+        JButton undoBtn = new JButton("\u21A9"); // Unicode für Undo-Pfeil
+        undoBtn.setFont(new Font("SansSerif", Font.PLAIN, 24));
+        undoBtn.setFocusPainted(false);
+        undoBtn.setMargin(new Insets(5, 5, 5, 5));
+        undoBtn.addActionListener(e -> {
+            // Verhindern, dass Undo gedrückt wird, während der Bot rechnet
+            Spieler aktuellerSpieler = (amZug == Figur.Farbe.WEISS) ? spielerWeiss : spielerSchwarz;
+            if (aktuellerSpieler.istBot() && !spielBeendet) return;
+
+            if (brett.undo()) {
+                // Spieler wechseln und Status zurücksetzen nur wenn Undo erfolgreich war
+                amZug = (amZug == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS;
+                spielBeendet = false; // Spiel wieder aufnehmen
+
+                // Speziallogik für Mensch vs. Bot:
+                // Wenn wir gegen einen Bot spielen, müssen wir ZWEI Züge zurückgehen,
+                // damit wir wieder dran sind.
+                Spieler jetzigerSpieler = (amZug == Figur.Farbe.WEISS) ? spielerWeiss : spielerSchwarz;
+                Spieler andererSpieler = (amZug == Figur.Farbe.WEISS) ? spielerSchwarz : spielerWeiss;
+
+                if (jetzigerSpieler.istBot() && !andererSpieler.istBot()) {
+                    if (brett.undo()) {
+                        amZug = (amZug == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS;
+                    } else {
+                        // Sonderfall: Bot hat das Spiel begonnen (erster Zug wurde zurückgenommen)
+                        // Dann muss der Bot jetzt neu ziehen
+                        checkAndPerformBotMove();
+                    }
+                }
+
+                ausgewaehlteFigur = null;
+                moeglicheZuege.clear();
+                aktualisiereBrett();
+                if(brettPanel != null){
+                    brettPanel.repaint();
+                }
+                pruefeSpielStatus();
+                
+                // Timer fortsetzen, falls er gestoppt war (und Zeitlimit aktiv ist)
+                if (gameTimer != null && !gameTimer.isRunning() && zeitWeiss != -1 && zeitWeiss > 0 && zeitSchwarz > 0) {
+                    gameTimer.start();
+                }
+            }
+        });
+
         menuContainer.add(menuBtn);
+        if (!(spielerWeiss.istBot() && spielerSchwarz.istBot())) {
+            menuContainer.add(undoBtn);
+        }
         leftPanel.add(menuContainer, BorderLayout.NORTH);
+
+        // Status Label unten links
+        statusLabel = new JLabel("", SwingConstants.CENTER);
+        statusLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
+        statusLabel.setBorder(BorderFactory.createEmptyBorder(20, 10, 20, 10));
+        leftPanel.add(statusLabel, BorderLayout.SOUTH);
 
         add(leftPanel, BorderLayout.WEST);
         add(rightPanel, BorderLayout.EAST);
@@ -88,8 +149,7 @@ public class SpielGUI extends JPanel implements ActionListener {
 
         boardLayeredPane = new JLayeredPane();
 
-        // Das eigentliche Schachbrett
-        brettPanel = new JPanel(new GridLayout(8, 8));
+
         brettPanel.setBorder(BorderFactory.createLineBorder(Color.BLACK));
         boardLayeredPane.add(brettPanel, JLayeredPane.DEFAULT_LAYER);
 
@@ -120,8 +180,37 @@ public class SpielGUI extends JPanel implements ActionListener {
                     }
                 };
                 felder[zeile][spalte].setMargin(new Insets(0, 0, 0, 0));
+                felder[zeile][spalte].putClientProperty("JButton.buttonType", "square"); // FlatLaf: Eckige Buttons erzwingen
                 felder[zeile][spalte].setFont(new Font("SansSerif", Font.PLAIN, 20));
                 felder[zeile][spalte].setFocusPainted(false); // Entfernt den Rahmen beim Anklicken
+                felder[zeile][spalte].setBorder(null);
+                felder[zeile][spalte].addMouseListener(new MouseAdapter() {
+                    @Override
+                    public void mouseEntered(MouseEvent e) {
+                        JButton btn = (JButton) e.getSource();
+                        if (btn.getBackground().equals(Color.YELLOW)) return;
+
+                        Color c = btn.getBackground();
+                        int darken = 30;
+                        btn.setBackground(new Color(
+                                Math.max(0, c.getRed() - darken),
+                                Math.max(0, c.getGreen() - darken),
+                                Math.max(0, c.getBlue() - darken)
+                        ));
+                    }
+
+                    @Override
+                    public void mouseExited(MouseEvent e) {
+                        JButton btn = (JButton) e.getSource();
+                        if (btn.getBackground().equals(Color.YELLOW)) return;
+
+                        if ((z + s) % 2 == 0) {
+                            btn.setBackground(Color.LIGHT_GRAY);
+                        } else {
+                            btn.setBackground(Color.WHITE);
+                        }
+                    }
+                });
                 if ((zeile + spalte) % 2 == 0) {
                     felder[zeile][spalte].setBackground(Color.LIGHT_GRAY);
                 } else {
@@ -181,7 +270,7 @@ public class SpielGUI extends JPanel implements ActionListener {
             for (int spalte = 0; spalte < 8; spalte++) {
                 Figur figur = brett.getFigur(zeile, spalte);
                 if (figur != null) {
-                    felder[zeile][spalte].setText(getFigurSymbol(figur));
+                    felder[zeile][spalte].setText(figur.getFigurIcon());
                 } else {
                     felder[zeile][spalte].setText("");
                 }
@@ -194,27 +283,9 @@ public class SpielGUI extends JPanel implements ActionListener {
         }
     }
 
-    private String getFigurSymbol(Figur figur) {
-        if (figur.getFarbe() == Figur.Farbe.WEISS) {
-            if (figur instanceof Bauer) return "\u2659";
-            if (figur instanceof Turm) return "\u2656";
-            if (figur instanceof Springer) return "\u2658";
-            if (figur instanceof Laeufer) return "\u2657";
-            if (figur instanceof Koenigin) return "\u2655";
-            if (figur instanceof Koenig) return "\u2654";
-        } else {
-            if (figur instanceof Bauer) return "\u265F";
-            if (figur instanceof Turm) return "\u265C";
-            if (figur instanceof Springer) return "\u265E";
-            if (figur instanceof Laeufer) return "\u265D";
-            if (figur instanceof Koenigin) return "\u265B";
-            if (figur instanceof Koenig) return "\u265A";
-        }
-        return "?";
-    }
-
     @Override
     public void actionPerformed(ActionEvent e) {
+        if (spielBeendet) return;
         if (isPromoting) return;
 
         // Wenn ein Bot am Zug ist, darf der Mensch nicht klicken
@@ -260,7 +331,8 @@ public class SpielGUI extends JPanel implements ActionListener {
                             }
 
                             amZug = (amZug == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS;
-                            checkAndPerformBotMove(); // Prüfen, ob jetzt ein Bot dran ist
+                            pruefeSpielStatus();
+                            if (!spielBeendet) checkAndPerformBotMove(); // Prüfen, ob jetzt ein Bot dran ist
                         }
                         ausgewaehlteFigur = null;
                         if ((vonZeile + vonSpalte) % 2 == 0) {
@@ -311,14 +383,13 @@ public class SpielGUI extends JPanel implements ActionListener {
         promotionPanel.removeAll();
 
         String[] typen = {"Dame", "Turm", "Läufer", "Springer"};
-        String[] symbole;
+        String[] symbole = new String[4];
         
-        // Passende Symbole je nach Farbe wählen
-        if (amZug == Figur.Farbe.WEISS) {
-            symbole = new String[]{"\u2655", "\u2656", "\u2657", "\u2658"};
-        } else {
-            symbole = new String[]{"\u265B", "\u265C", "\u265D", "\u265E"};
-        }
+        // Symbole dynamisch von den Klassen holen
+        symbole[0] = new Koenigin(amZug).getFigurIcon();
+        symbole[1] = new Turm(amZug).getFigurIcon();
+        symbole[2] = new Laeufer(amZug).getFigurIcon();
+        symbole[3] = new Springer(amZug).getFigurIcon();
 
         // Reihenfolge anpassen:
         // Weiß (oben): Dame, Turm, Läufer, Springer (nach unten)
@@ -334,6 +405,7 @@ public class SpielGUI extends JPanel implements ActionListener {
             // Schriftgröße vom aktuellen Brett übernehmen
             btn.setFont(felder[0][0].getFont());
             btn.setMargin(new Insets(0, 0, 0, 0));
+            btn.putClientProperty("JButton.buttonType", "square"); // Auch hier eckig für Konsistenz
             btn.setFocusPainted(false);
             btn.setBackground(Color.WHITE);
             
@@ -343,7 +415,8 @@ public class SpielGUI extends JPanel implements ActionListener {
                 isPromoting = false; // Brett wieder freigeben
                 amZug = (amZug == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS;
                 aktualisiereBrett();
-                checkAndPerformBotMove(); // Nach Promotion könnte ein Bot dran sein
+                pruefeSpielStatus();
+                if (!spielBeendet) checkAndPerformBotMove(); // Nach Promotion könnte ein Bot dran sein
             });
             promotionPanel.add(btn);
         }
@@ -373,7 +446,10 @@ public class SpielGUI extends JPanel implements ActionListener {
             
             if (zeitWeiss <= 0 || zeitSchwarz <= 0) {
                 gameTimer.stop();
-                JOptionPane.showMessageDialog(this, "Zeit abgelaufen!");
+                spielBeendet = true;
+                String msg = (zeitWeiss <= 0) ? "Zeit abgelaufen: Weiß hat verloren" : "Zeit abgelaufen: Schwarz hat verloren";
+                statusLabel.setText("<html><center>" + msg + "</center></html>");
+                SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, msg));
             }
         });
         gameTimer.start();
@@ -405,17 +481,48 @@ public class SpielGUI extends JPanel implements ActionListener {
 
                 // Zug im GUI-Thread ausführen
                 SwingUtilities.invokeLater(() -> {
+                    if (spielBeendet) return;
                     if (zug != null && zug.length == 6) {
                         brett.bewegeFigur(zug[0], zug[1], zug[2], zug[3], zug[4], zug[5]);
 
                         amZug = (amZug == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS;
                         aktualisiereBrett();
+                        pruefeSpielStatus();
                         
                         // Rekursiver Aufruf, falls Bot vs Bot
-                        checkAndPerformBotMove();
+                        if (!spielBeendet) checkAndPerformBotMove();
                     }
                 });
             }).start();
+        }
+    }
+
+    private void pruefeSpielStatus() {
+        int status = brett.getSchachmatt();
+        if (status != 0) {
+            spielBeendet = true;
+            if (gameTimer != null) gameTimer.stop();
+
+            String nachricht = "";
+            if (status == -1) nachricht = "Schachmatt: Weiß hat gewonnen";
+            else if (status == 1) nachricht = "Schachmatt: Schwarz hat gewonnen";
+            else if (status == -2 || status == 2) nachricht = "Patt: Unentschieden";
+            else if (status == 3) nachricht = "Remis: Zu wenig Material";
+
+            statusLabel.setText("<html><center>" + nachricht + "</center></html>");
+            String finalNachricht = nachricht;
+            SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, finalNachricht));
+        } else {
+            boolean weissImSchach = brett.istKoenigBedroht(Figur.Farbe.WEISS);
+            boolean schwarzImSchach = brett.istKoenigBedroht(Figur.Farbe.SCHWARZ);
+
+            if (weissImSchach) {
+                statusLabel.setText("<html><center>Weiß<br>im Schach</center></html>");
+            } else if (schwarzImSchach) {
+                statusLabel.setText("<html><center>Schwarz<br>im Schach</center></html>");
+            } else {
+                statusLabel.setText("");
+            }
         }
     }
 }

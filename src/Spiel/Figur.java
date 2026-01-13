@@ -4,6 +4,7 @@ public abstract class Figur {
 
     private final Farbe farbe;
     private boolean hatSichBewegt = false;
+    private String figurIcon;
     private int zeile;
     private int spalte;
 
@@ -13,6 +14,14 @@ public abstract class Figur {
 
     public Farbe getFarbe() {
         return farbe;
+    }
+
+    public String getFigurIcon() {
+        return figurIcon;
+    }
+
+    protected void setFigurIcon(String figurIcon) {
+        this.figurIcon = figurIcon;
     }
 
     public boolean hatSichBewegt() {

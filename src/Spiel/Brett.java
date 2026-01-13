@@ -5,7 +5,7 @@ import java.util.ArrayList;
 public class Brett {
 
     private final Figur[][] felder = new Figur[8][8];
-    private final Figur[][] testfeld = new Figur[8][8];
+    private final ZugRegister zugRegister = new ZugRegister();
 
     private final int[] posKoenigWeiss = new int[2];
     private final int[] posKoenigSchwarz = new int[2];
@@ -38,17 +38,27 @@ public class Brett {
         Figur figur = felder[vonZeile][vonSpalte];
         Figur.Farbe gegnerFarbe = (figur.getFarbe() == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS;
         ArrayList<Figur> gegnerFiguren = (gegnerFarbe == Figur.Farbe.WEISS) ? weisseFiguren : schwarzeFiguren;
+        boolean warErsterZug = !figur.hatSichBewegt();
+        int geschlageneFigurTyp = 0;
+        boolean hatOpferSichBewegt = false;
+        int enPassantGeschlagenSpalte = -1; // Speichert die Spalte, falls ein EP-Schlag stattfindet
 
         // Schlagzug: Gegnerische Figur aus Liste entfernen
         if (felder[nachZeile][nachSpalte] != null) {
+            geschlageneFigurTyp = getFigurTypID(felder[nachZeile][nachSpalte]);
+            hatOpferSichBewegt = felder[nachZeile][nachSpalte].hatSichBewegt();
             gegnerFiguren.remove(felder[nachZeile][nachSpalte]);
         }
 
         //enPassant Logik: Der andere Bauer muss verschwinden
         if (figur instanceof Bauer && vonSpalte != nachSpalte && felder[nachZeile][nachSpalte] == null) {
             Figur opfer = felder[vonZeile][nachSpalte];
+            if (opfer != null) {
+                hatOpferSichBewegt = opfer.hatSichBewegt();
+                gegnerFiguren.remove(opfer);
+                enPassantGeschlagenSpalte = nachSpalte; // Wichtig für Undo: Wir merken uns, wo geschlagen wurde
+            }
             felder[vonZeile][nachSpalte] = null;
-            if (opfer != null) gegnerFiguren.remove(opfer);
         }
 
         // Rochade Logik: Wenn König 2 Schritte macht, bewege auch den Turm
@@ -95,6 +105,8 @@ public class Brett {
 
         if (figur != null) figur.setHatSichBewegt(true);
 
+        zugRegister.registerZug(vonZeile, vonSpalte, nachZeile, nachSpalte, istPromotion, promotionTyp, enPassantGeschlagenSpalte, geschlageneFigurTyp, warErsterZug, hatOpferSichBewegt);
+
         spielZuende(gegnerFarbe);
 
         System.out.println("Schwarz: " + istKoenigBedroht(Figur.Farbe.SCHWARZ));
@@ -123,11 +135,108 @@ public class Brett {
             neueFigur = new Koenigin(farbe); // Standard ist Dame
         }
 
+        neueFigur.setHatSichBewegt(true);
+
         // Neue Figur platzieren (nutzt deine existierende Hilfsmethode)
         platzieren(neueFigur, zeile, spalte);
 
         // Spielstatus neu berechnen, da die neue Figur Schach geben könnte
         spielZuende((farbe == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS);
+    }
+
+    public boolean undo() {
+        int letzterZug = zugRegister.undo();
+        if (letzterZug == -1) return false;
+
+        int startFeld = letzterZug & 0x3F;
+        int zielFeld = (letzterZug >> 6) & 0x3F;
+        int istPromotion = (letzterZug >> 12) & 1;
+        int enPassant = ((letzterZug >> 15) & 15) - 1; // Maske auf 15 (4 Bits) erhöht
+        int geschlageneTyp = (letzterZug >> 19) & 7;
+        boolean warErsterZug = ((letzterZug >> 22) & 1) == 1;
+        boolean hatOpferSichBewegt = ((letzterZug >> 23) & 1) == 1;
+
+        int vonZeile = startFeld >> 3;
+        int vonSpalte = startFeld & 7;
+        int nachZeile = zielFeld >> 3;
+        int nachSpalte = zielFeld & 7;
+
+        // Die Figur steht aktuell auf dem Zielfeld!
+        Figur figur = felder[nachZeile][nachSpalte];
+        if (figur == null) return false;
+
+        // Falls Promotion war: Zurück zum Bauern
+        if (istPromotion == 1) {
+            ArrayList<Figur> figurenListe = (figur.getFarbe() == Figur.Farbe.WEISS) ? weisseFiguren : schwarzeFiguren;
+            figurenListe.remove(figur);
+
+            figur = new Bauer(figur.getFarbe());
+            figurenListe.add(figur);
+        }
+
+        // Figur zurückbewegen
+        felder[vonZeile][vonSpalte] = figur;
+        felder[nachZeile][nachSpalte] = null;
+        figur.setZeile(vonZeile);
+        figur.setSpalte(vonSpalte);
+        if (warErsterZug) figur.setHatSichBewegt(false);
+
+        // Königsposition aktualisieren
+        if (figur instanceof Koenig) {
+            setKoenigPos(figur.getFarbe(), vonZeile, vonSpalte);
+        }
+
+        // Rochade rückgängig machen (Turm zurückstellen)
+        if (figur instanceof Koenig && Math.abs(vonSpalte - nachSpalte) == 2) {
+            int turmZielSpalte = (nachSpalte > vonSpalte) ? nachSpalte - 1 : nachSpalte + 1;
+            int turmStartSpalte = (nachSpalte > vonSpalte) ? 7 : 0;
+            Figur turm = felder[vonZeile][turmZielSpalte];
+            if (turm != null) {
+                felder[vonZeile][turmStartSpalte] = turm;
+                felder[vonZeile][turmZielSpalte] = null;
+                turm.setSpalte(turmStartSpalte);
+                turm.setHatSichBewegt(false);
+            }
+        }
+
+        // Geschlagene Figur wiederherstellen
+        if (enPassant != -1) {
+            Figur.Farbe gegnerFarbe = (figur.getFarbe() == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS;
+            Bauer opfer = new Bauer(gegnerFarbe);
+            platzieren(opfer, vonZeile, nachSpalte);
+            opfer.setHatSichBewegt(true);
+            opfer.setHatSichBewegt(hatOpferSichBewegt);
+        } else if (geschlageneTyp > 0) {
+            Figur.Farbe gegnerFarbe = (figur.getFarbe() == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS;
+            Figur opfer = erzeugeFigurAusTyp(geschlageneTyp, gegnerFarbe);
+            platzieren(opfer, nachZeile, nachSpalte);
+            // Wir wissen nicht genau, ob sie sich bewegt hat, aber meistens ja, wenn sie mitten auf dem Brett geschlagen wurde.
+            // Für Rochade-Rechte des Gegners wäre das wichtig, aber das ist komplexer.
+            opfer.setHatSichBewegt(true);
+            opfer.setHatSichBewegt(hatOpferSichBewegt);
+        }
+
+        return true;
+    }
+
+    private int getFigurTypID(Figur f) {
+        if (f instanceof Bauer) return 1;
+        if (f instanceof Turm) return 2;
+        if (f instanceof Springer) return 3;
+        if (f instanceof Laeufer) return 4;
+        if (f instanceof Koenigin) return 5;
+        return 6; // König
+    }
+
+    private Figur erzeugeFigurAusTyp(int typ, Figur.Farbe farbe) {
+        switch (typ) {
+            case 1: return new Bauer(farbe);
+            case 2: return new Turm(farbe);
+            case 3: return new Springer(farbe);
+            case 4: return new Laeufer(farbe);
+            case 5: return new Koenigin(farbe);
+            default: return new Koenig(farbe);
+        }
     }
 
     public boolean istZugGueltig(int vonZeile, int vonSpalte, int nachZeile, int nachSpalte) {
@@ -224,14 +333,6 @@ public class Brett {
         }
 
         return false;
-    }
-
-    private void testFeldAktualisieren() {
-        for (int i = 0; i <= 7; i++) {
-            for (int j = 0; j <= 7; j++) {
-                testfeld[i][j] = felder[i][j];
-            }
-        }
     }
 
     private boolean hatKeineLegalenZuege(Figur.Farbe farbe) {
