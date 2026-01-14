@@ -12,6 +12,6 @@ public class RandomBotSpieler extends BotSpieler{
         int[] alleZuege = generiereAlleZuege(brett, farbe);
         Random random = new Random();
         int randomIndex = random.nextInt(alleZuege.length);
-        return bitmaskZugDekodieren(alleZuege[randomIndex]);
+        return zugDekodieren(alleZuege[randomIndex]);
     }
 }

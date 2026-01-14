@@ -47,7 +47,7 @@ public class MainMenu extends JFrame {
         // Bot vs Spieler (Mensch ist Weiß, Bot ist Schwarz)
         botVsSpielerBtn.addActionListener(e -> {
             Spieler weiss = new MenschSpieler(Figur.Farbe.WEISS);
-            Spieler schwarz = new RandomBotSpieler(Figur.Farbe.SCHWARZ);
+            Spieler schwarz = new ersterBotSpieler(Figur.Farbe.SCHWARZ);
             mainContainer.add(new SpielGUI(() -> cardLayout.show(mainContainer, "Menu"), spielZeit, weiss, schwarz), "Spiel");
             cardLayout.show(mainContainer, "Spiel");
         });
@@ -62,7 +62,7 @@ public class MainMenu extends JFrame {
 
         // Bot vs Bot
         botVsBotBtn.addActionListener(e -> {
-            Spieler weiss = new RandomBotSpieler(Figur.Farbe.WEISS);
+            Spieler weiss = new ersterBotSpieler(Figur.Farbe.WEISS);
             Spieler schwarz = new RandomBotSpieler(Figur.Farbe.SCHWARZ);
             mainContainer.add(new SpielGUI(() -> cardLayout.show(mainContainer, "Menu"), spielZeit, weiss, schwarz), "Spiel");
             cardLayout.show(mainContainer, "Spiel");

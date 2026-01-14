@@ -36,6 +36,7 @@ public class Brett {
 
     private void bewegeFigur(Figur[][] felder, int vonZeile, int vonSpalte, int nachZeile, int nachSpalte, int istPromotion, int promotionTyp) {
         Figur figur = felder[vonZeile][vonSpalte];
+        if (figur == null) return; // Sicherheitscheck gegen NPE
         Figur.Farbe gegnerFarbe = (figur.getFarbe() == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS;
         ArrayList<Figur> gegnerFiguren = (gegnerFarbe == Figur.Farbe.WEISS) ? weisseFiguren : schwarzeFiguren;
         boolean warErsterZug = !figur.hatSichBewegt();
@@ -108,10 +109,6 @@ public class Brett {
         zugRegister.registerZug(vonZeile, vonSpalte, nachZeile, nachSpalte, istPromotion, promotionTyp, enPassantGeschlagenSpalte, geschlageneFigurTyp, warErsterZug, hatOpferSichBewegt);
 
         spielZuende(gegnerFarbe);
-
-        System.out.println("Schwarz: " + istKoenigBedroht(Figur.Farbe.SCHWARZ));
-        System.out.println("Weiss: " + istKoenigBedroht(Figur.Farbe.WEISS) + "\nSchachmatt?: " + schachMatt);
-        System.out.println(enPassantMoeglich);
     }
 
     public void promoviereBauer(int zeile, int spalte, String neuerTyp) {

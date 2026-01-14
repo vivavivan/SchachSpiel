@@ -63,7 +63,7 @@ public abstract class BotSpieler extends Spieler{
     }
 
     // Hilfsmethode zum Entschlüsseln der Züge
-    protected int[] bitmaskZugDekodieren(int move) {
+    protected int[] zugDekodieren(int move) {
         int zielFeld = move & 0x3F;       // Die unteren 6 Bits (111111 in binär ist 0x3F)
         int startFeld = (move >> 6) & 0x3F; // 6 Bits nach rechts schieben, dann "isolieren"
 
