@@ -1,127 +1,100 @@
 package Spiel;
 
+import java.util.List;
+
+/**
+ * Ein einfacher "gieriger" Bot.
+ * Er schaut nur einen Zug voraus und wählt den Zug,
+ * der sofort den höchsten Materialgewinn verspricht.
+ */
 public class ersterBotSpieler extends BotSpieler {
+
     public ersterBotSpieler(Figur.Farbe farbe) {
         super(farbe);
-
     }
 
+    // Die Hauptmethode des Bots.
+    // Generiert alle Züge, simuliert jeden einzelnen und wählt den mit der besten Bewertung.
     @Override
     public int[] berechneZug(Brett brett) {
-        // Starte Minimax mit Tiefe 3 (kannst du auf 4 erhöhen, wenn es performant genug ist)
-        int besterZug = minimaxRoot(brett, 3, true);
-        if (besterZug == 0) return null; // Verhindert NPE, wenn kein Zug möglich ist
-        return zugDekodieren(besterZug);
-    }
+        Brett brettKopie = brett.erstelleKopie();
 
-    // Root-Funktion: Iteriert über alle Züge und wählt den besten aus
-    private int minimaxRoot(Brett brett, int tiefe, boolean isMaximizing) {
-        int[] alleZuege = generiereAlleZuege(brett, this.farbe);
-        
-        // Fallback, falls keine Züge möglich sind
-        if (alleZuege.length == 0) return 0;
+        // 1. Alle legalen Züge für die aktuelle Farbe holen
+        int[] alleZuege = generiereAlleZuege(brettKopie, this.farbe);
 
-        int besterZugEncodiert = alleZuege[0];
-        int besteBewertung = -2000000000; // Minus Unendlich
+        // Züge mischen, damit bei gleicher Bewertung nicht immer der gleiche Zug gewählt wird
+        mischeZuege(alleZuege);
 
+        if (alleZuege.length == 0) return null;
+
+        int besterZugEncoded = alleZuege[0];
+        int besteBewertung = Integer.MIN_VALUE;
+
+        // 2. Jeden Zug simulieren und bewerten
         for (int zugEncodiert : alleZuege) {
             int[] zugDecodiert = zugDekodieren(zugEncodiert);
-            brett.bewegeFigur(zugDecodiert[0], zugDecodiert[1], zugDecodiert[2], zugDecodiert[3], zugDecodiert[4], zugDecodiert[5]);
 
-            // Nach unserem Zug ist der Gegner dran (minimizing)
-            int wert = minimax(brett, tiefe - 1, -2000000000, 2000000000, false);
-            
-            brett.undo();
+            // Zug auf dem Brett ausführen
+            brettKopie.bewegeFigur(zugDecodiert[0], zugDecodiert[1], zugDecodiert[2], zugDecodiert[3], zugDecodiert[4], zugDecodiert[5]);
 
-            if (wert > besteBewertung) {
-                besteBewertung = wert;
-                besterZugEncodiert = zugEncodiert;
+            // Stellung bewerten
+            int aktuelleBewertung = evaluieren(brettKopie);
+
+            // Zug sofort wieder rückgängig machen
+            brettKopie.undo();
+
+            // Wenn dieser Zug besser ist als der bisherige, speichern
+            if (aktuelleBewertung > besteBewertung) {
+                besteBewertung = aktuelleBewertung;
+                besterZugEncoded = zugEncodiert;
             }
         }
-        return besterZugEncodiert;
+
+        // Den besten gefundenen Zug dekodieren und zurückgeben
+        return zugDekodieren(besterZugEncoded);
     }
 
-    // Rekursive Minimax-Funktion mit Alpha-Beta Pruning
-    private int minimax(Brett brett, int tiefe, int alpha, int beta, boolean isMaximizing) {
-        if (tiefe == 0) {
-            return evaluieren(brett, this.farbe);
-        }
-
-        // Wir müssen prüfen, wer gerade am Zug ist für die Zuggenerierung
-        Figur.Farbe aktuelleFarbe = isMaximizing ? this.farbe : gegenFarbe(this.farbe);
-        int[] alleZuege = generiereAlleZuege(brett, aktuelleFarbe);
-
-        if (alleZuege.length == 0) {
-            // Keine Züge mehr -> Matt oder Patt bewerten
-            return evaluieren(brett, this.farbe);
-        }
-
-        if (isMaximizing) {
-            int maxEval = -2000000000;
-            for (int zugEncodiert : alleZuege) {
-                int[] zugDecodiert = zugDekodieren(zugEncodiert);
-                brett.bewegeFigur(zugDecodiert[0], zugDecodiert[1], zugDecodiert[2], zugDecodiert[3], zugDecodiert[4], zugDecodiert[5]);
-                
-                int eval = minimax(brett, tiefe - 1, alpha, beta, false);
-                brett.undo();
-                
-                maxEval = Math.max(maxEval, eval);
-                alpha = Math.max(alpha, eval);
-                if (beta <= alpha) break;
-            }
-            return maxEval;
-        } else {
-            int minEval = 2000000000;
-            for (int zugEncodiert : alleZuege) {
-                int[] zugDecodiert = zugDekodieren(zugEncodiert);
-                brett.bewegeFigur(zugDecodiert[0], zugDecodiert[1], zugDecodiert[2], zugDecodiert[3], zugDecodiert[4], zugDecodiert[5]);
-                
-                int eval = minimax(brett, tiefe - 1, alpha, beta, true);
-                brett.undo();
-                
-                minEval = Math.min(minEval, eval);
-                beta = Math.min(beta, eval);
-                if (beta <= alpha) break;
-            }
-            return minEval;
-        }
-    }
-
-    private int evaluieren(Brett brett, Figur.Farbe farbe) {
-        int ende = brett.getSchachmatt();
-        if(farbe == Figur.Farbe.WEISS) {
-            if(ende == -1) return 1000000; // Schwarz Matt -> Weiß gewinnt
-            if(ende == 1) return -1000000; // Weiß Matt -> Weiß verliert
-        }else{
-            if(ende == 1) return 1000000; // Weiß Matt -> Schwarz gewinnt
-            if(ende == -1) return -1000000; // Schwarz Matt -> Schwarz verliert
-        }
-        if(ende == 2 || ende == -2 || ende == 3) return 0;
-
-        return materialWert(brett, farbe) - materialWert(brett, (farbe == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS);
-    }
-
-    private int materialWert(Brett brett, Figur.Farbe farbe) {
+    /*
+     * Bewertet die aktuelle Brettstellung.
+     * Hauptsächlich basierend auf dem Materialwert, mit einem kleinen Bonus für ein Schachgebot.
+     */
+    private int evaluieren(Brett brett) {
+        // Falls das Spiel durch den Zug endet
+        int status = brett.getSchachmatt();
+        boolean istSchach = brett.istKoenigBedroht(gegnerFarbe());
         int wert = 0;
-        // Nutze die Listen direkt aus dem Brett, falls möglich, oder iteriere (hier vereinfacht über ArrayList)
-        java.util.ArrayList<Figur> figuren = (farbe == Figur.Farbe.WEISS) ? brett.getWeisseFiguren() : brett.getSchwarzeFiguren();
-        for(Figur figur : figuren) {
-            if(figur instanceof Bauer) {
-                wert += 1;
-            }else if(figur instanceof Springer) {
-                wert += 3;
-            }else if(figur instanceof Laeufer) {
-                wert += 3;
-            }else if(figur instanceof Turm) {
-                wert += 5;
-            }else if(figur instanceof Koenigin) {
-                wert += 9;
-            }
+        if (this.farbe == Figur.Farbe.WEISS) {
+            if (status == -1) return 100000; // Sieg für Weiß
+            if (status == 1) return -100000;  // Sieg für Schwarz
+        } else {
+            if (status == 1) return 100000;  // Sieg für Schwarz
+            if (status == -1) return -100000; // Sieg für Weiß
+        }
+        if (status == 2 || status == -2 || status == 3) return 0;
+
+        if(istSchach) {
+            wert += 30; //damit er manchmal schachsetzen kann;
+        }
+
+        return berechneMaterialWert(brett, this.farbe) + wert - berechneMaterialWert(brett, gegnerFarbe());
+    }
+
+    private int berechneMaterialWert(Brett brett, Figur.Farbe f) {
+        int wert = 0;
+        List<Figur> figuren = (f == Figur.Farbe.WEISS) ? brett.getWeisseFiguren() : brett.getSchwarzeFiguren();
+
+        for (Figur figur : figuren) {
+            if (figur instanceof Bauer) wert += 100;
+            else if (figur instanceof Springer) wert += 300;
+            else if (figur instanceof Laeufer) wert += 300;
+            else if (figur instanceof Turm) wert += 500;
+            else if (figur instanceof Koenigin) wert += 900;
+            //else if (figur instanceof Koenig) wert += 10000;
         }
         return wert;
     }
 
-    private Figur.Farbe gegenFarbe(Figur.Farbe farbe) {
-        return (farbe == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS;
+    private Figur.Farbe gegnerFarbe() {
+        return (this.farbe == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS;
     }
 }

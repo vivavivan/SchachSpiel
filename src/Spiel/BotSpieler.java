@@ -15,12 +15,12 @@ public abstract class BotSpieler extends Spieler{
         
         // Maximal mögliche Züge im Schach sind selten über 218, 256 ist clean
         int[] zugSpeicher = new int[256];
-        int count = 0;
+        int anzahl = 0;
 
         if(farbe == Figur.Farbe.WEISS) {
-            moeglicheFiguren = brett.getWeisseFiguren();
+            moeglicheFiguren = new ArrayList<>(brett.getWeisseFiguren());
         }else if(farbe == Figur.Farbe.SCHWARZ) {
-            moeglicheFiguren = brett.getSchwarzeFiguren();
+            moeglicheFiguren = new ArrayList<>(brett.getSchwarzeFiguren());
         }
 
         for(Figur figur : moeglicheFiguren) {
@@ -31,9 +31,14 @@ public abstract class BotSpieler extends Spieler{
             int startFeld = (vonZeile << 3) | vonSpalte;
 
             ArrayList<int[]> zuegeEinerFigur = brett.getLegaleZuege(vonZeile, vonSpalte);
-            for(int[] endFeld : zuegeEinerFigur) {
-                int nachZeile = endFeld[0];
-                int nachSpalte = endFeld[1];
+            for(int[] zielKoordinaten : zuegeEinerFigur) {
+                // Array vergrößern, falls voll (wir fügen bis zu 4 Züge hinzu)
+                if (anzahl + 4 >= zugSpeicher.length) {
+                    zugSpeicher = Arrays.copyOf(zugSpeicher, zugSpeicher.length * 2);
+                }
+
+                int nachZeile = zielKoordinaten[0];
+                int nachSpalte = zielKoordinaten[1];
                 int zielFeld = (nachZeile << 3) | nachSpalte;
 
                 int basisZug = (startFeld << 6) | zielFeld;
@@ -42,19 +47,29 @@ public abstract class BotSpieler extends Spieler{
                 // Bauer erreicht die letzte oder erste Zeile
                 if (figur instanceof Bauer && (nachZeile == 0 || nachZeile == 7)) {
                     // 4 unterschiedliche Züge für Dame, Turm, Läufer, Springer
-                    for (int promoTyp = 0; promoTyp < 4; promoTyp++) {
+                    for (int umwandlungsTyp = 0; umwandlungsTyp < 4; umwandlungsTyp++) {
                         // Bit 12: Promotion?, Bits 13-14: Welcher Typ?
-                        int promoZug = basisZug | (1 << 12) | (promoTyp << 13);
-                        zugSpeicher[count++] = promoZug;
+                        int umwandlungsZug = basisZug | (1 << 12) | (umwandlungsTyp << 13);
+                        zugSpeicher[anzahl++] = umwandlungsZug;
                     }
                 } else {
                     // Normaler Zug ohne Umwandlung
-                    zugSpeicher[count++] = basisZug;
+                    zugSpeicher[anzahl++] = basisZug;
                 }
             }
         }
 
-        return Arrays.copyOf(zugSpeicher, count);
+        return Arrays.copyOf(zugSpeicher, anzahl);
+    }
+
+    protected void mischeZuege(int[] zuege) {
+        java.util.Random zufall = new java.util.Random();
+        for (int i = zuege.length - 1; i > 0; i--) {
+            int index = zufall.nextInt(i + 1);
+            int temp = zuege[index];
+            zuege[index] = zuege[i];
+            zuege[i] = temp;
+        }
     }
 
     @Override
@@ -63,19 +78,19 @@ public abstract class BotSpieler extends Spieler{
     }
 
     // Hilfsmethode zum Entschlüsseln der Züge
-    protected int[] zugDekodieren(int move) {
-        int zielFeld = move & 0x3F;       // Die unteren 6 Bits (111111 in binär ist 0x3F)
-        int startFeld = (move >> 6) & 0x3F; // 6 Bits nach rechts schieben, dann "isolieren"
+    protected int[] zugDekodieren(int zugKodiert) {
+        int zielFeld = zugKodiert & 0x3F;       // Die unteren 6 Bits (111111 in binär ist 0x3F)
+        int startFeld = (zugKodiert >> 6) & 0x3F; // 6 Bits nach rechts schieben, dann "isolieren"
 
         // Bei Bauernumwandlung
-        int istPromotion = (move >> 12) & 1;
-        int promoTypIndex = (move >> 13) & 3;
+        int istPromotion = (zugKodiert >> 12) & 1;
+        int umwandlungsTypIndex = (zugKodiert >> 13) & 3;
 
         int vonZeile = startFeld >> 3;    // Sozusagen durch 8 teilen
         int vonSpalte = startFeld & 7;    // Sozusagen modulo 8
         int nachZeile = zielFeld >> 3;
         int nachSpalte = zielFeld & 7;
 
-        return new int[]{vonZeile, vonSpalte, nachZeile, nachSpalte, istPromotion, promoTypIndex};
+        return new int[]{vonZeile, vonSpalte, nachZeile, nachSpalte, istPromotion, umwandlungsTypIndex};
     }
 }

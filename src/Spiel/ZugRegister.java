@@ -11,7 +11,7 @@ public class ZugRegister {
 
     }
 
-    public void registerZug(int vonZeile, int vonSpalte, int nachZeile, int nachSpalte, int istPromotion, int promotionTyp, int enPassant, int geschlageneFigurTyp, boolean warErsterZug, boolean hatOpferSichBewegt) {
+    public void registriereZug(int vonZeile, int vonSpalte, int nachZeile, int nachSpalte, int istPromotion, int promotionTyp, int enPassant, int geschlageneFigurTyp, boolean warErsterZug, boolean hatOpferSichBewegt) {
         // 1. Prüfen, ob das Array voll ist
         if (anzahlZuege >= zugSpeicher.length) {
             // Array verdoppeln (sehr effizient)
@@ -30,11 +30,18 @@ public class ZugRegister {
         zugSpeicher[anzahlZuege++] = zugWert;
     }
 
-    public int undo() {
+    public int gibLetztenZug() {
         if (anzahlZuege > 0) {
             anzahlZuege--;
             return zugSpeicher[anzahlZuege];
         }
         return -1; // Kein Zug mehr da
+    }
+
+    public ZugRegister kopie() {
+        ZugRegister neu = new ZugRegister();
+        neu.zugSpeicher = Arrays.copyOf(this.zugSpeicher, this.zugSpeicher.length);
+        neu.anzahlZuege = this.anzahlZuege;
+        return neu;
     }
 }

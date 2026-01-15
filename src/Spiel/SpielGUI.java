@@ -11,36 +11,51 @@ import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Die Hauptklasse für die grafische Benutzeroberfläche (GUI).
+ * Sie ist verantwortlich für das Zeichnen des Bretts, der Figuren und die Verarbeitung von Spielereingaben.
+ */
 public class SpielGUI extends JPanel implements ActionListener {
 
+    // --- GUI-Komponenten ---
     private final JPanel brettPanel;
     private final JButton[][] felder = new JButton[8][8];
-    private final Brett brett;
     private final JPanel leftPanel;
     private final JPanel rightPanel;
-    private final JLayeredPane boardLayeredPane;
-    private final JPanel promotionPanel;
-    private boolean isPromoting = false;
-    private int promotionZeile = -1;
-    private int promotionSpalte = -1;
+    private final JLayeredPane brettEbenenPanel;
+    private final JPanel umwandlungsPanel;
+    private JLabel statusAnzeige;
+    private JLabel timerAnzeigeWeiss;
+    private JLabel timerAnzeigeSchwarz;
+
+    // --- Spiel-Logik & Status ---
+    private final Brett brett;
+    private boolean istAmUmwandeln = false;
+    private int umwandlungsZeile = -1;
+    private int umwandlungsSpalte = -1;
     private List<int[]> moeglicheZuege = new ArrayList<>();
     private boolean spielBeendet = false;
-    private JLabel statusLabel;
 
     private Figur ausgewaehlteFigur;
     private int vonZeile = -1;
     private int vonSpalte = -1;
     private Figur.Farbe amZug = Figur.Farbe.WEISS;
     
-    private JLabel timerWeissLabel;
-    private JLabel timerSchwarzLabel;
     private int zeitWeiss = 600; // 10 Minuten in Sekunden
     private int zeitSchwarz = 600;
-    private Timer gameTimer;
+    private Timer spielTimer;
 
+    // Die beiden Spieler (können Mensch oder Bot sein).
     private final Spieler spielerWeiss;
     private final Spieler spielerSchwarz;
 
+    /**
+     * Erstellt das komplette Spielfenster.
+     * @param zurueckZumMenu Eine Funktion, die aufgerufen wird, um zum Hauptmenü zurückzukehren.
+     * @param zeitLimit Das Zeitlimit pro Spieler in Sekunden (-1 für unendlich).
+     * @param spielerWeiss Das Spieler-Objekt für Weiß.
+     * @param spielerSchwarz Das Spieler-Objekt für Schwarz.
+     */
     public SpielGUI(Runnable zurueckZumMenu, int zeitLimit, Spieler spielerWeiss, Spieler spielerSchwarz) {
         super(new BorderLayout());
         this.brett = new Brett();
@@ -50,7 +65,7 @@ public class SpielGUI extends JPanel implements ActionListener {
         this.spielerWeiss = spielerWeiss;
         this.spielerSchwarz = spielerSchwarz;
 
-        // Das eigentliche Schachbrett
+        // --- Aufbau der GUI-Struktur ---
         brettPanel = new JPanel(new GridLayout(8, 8));
 
         //Seiten-Panels erstellen
@@ -62,33 +77,33 @@ public class SpielGUI extends JPanel implements ActionListener {
         rightPanel.setPreferredSize(new Dimension(180, 0));
         rightPanel.setBackground(Color.LIGHT_GRAY);
         rightPanel.setLayout(new BorderLayout());
-        
-        timerSchwarzLabel = createTimerLabel();
-        rightPanel.add(timerSchwarzLabel, BorderLayout.NORTH);
-        
-        timerWeissLabel = createTimerLabel();
-        rightPanel.add(timerWeissLabel, BorderLayout.SOUTH);
+
+        timerAnzeigeSchwarz = erstelleTimerAnzeige();
+        rightPanel.add(timerAnzeigeSchwarz, BorderLayout.NORTH);
+
+        timerAnzeigeWeiss = erstelleTimerAnzeige();
+        rightPanel.add(timerAnzeigeWeiss, BorderLayout.SOUTH);
 
         // Menü-Button Container (damit er oben links bleibt)
-        JPanel menuContainer = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        menuContainer.setOpaque(false);
+        JPanel menueContainer = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        menueContainer.setOpaque(false);
 
         // Menü-Button (Hamburger-Icon)
-        JButton menuBtn = new JButton("\u2190");
-        menuBtn.setFont(new Font("SansSerif", Font.PLAIN, 24));
-        menuBtn.setFocusPainted(false);
-        menuBtn.setMargin(new Insets(5, 5, 5, 5));
-        menuBtn.addActionListener(e -> {
-            if (gameTimer != null) gameTimer.stop();
+        JButton menueKnopf = new JButton("\u2190");
+        menueKnopf.setFont(new Font("SansSerif", Font.PLAIN, 24));
+        menueKnopf.setFocusPainted(false);
+        menueKnopf.setMargin(new Insets(5, 5, 5, 5));
+        menueKnopf.addActionListener(e -> {
+            if (spielTimer != null) spielTimer.stop();
             zurueckZumMenu.run();
         });
 
         // Undo-Button
-        JButton undoBtn = new JButton("\u21A9"); // Unicode für Undo-Pfeil
-        undoBtn.setFont(new Font("SansSerif", Font.PLAIN, 24));
-        undoBtn.setFocusPainted(false);
-        undoBtn.setMargin(new Insets(5, 5, 5, 5));
-        undoBtn.addActionListener(e -> {
+        JButton undoKnopf = new JButton("\u21A9"); // Unicode für Undo-Pfeil
+        undoKnopf.setFont(new Font("SansSerif", Font.PLAIN, 24));
+        undoKnopf.setFocusPainted(false);
+        undoKnopf.setMargin(new Insets(5, 5, 5, 5));
+        undoKnopf.addActionListener(e -> {
             // Verhindern, dass Undo gedrückt wird, während der Bot rechnet
             Spieler aktuellerSpieler = (amZug == Figur.Farbe.WEISS) ? spielerWeiss : spielerSchwarz;
             if (aktuellerSpieler.istBot() && !spielBeendet) return;
@@ -110,7 +125,7 @@ public class SpielGUI extends JPanel implements ActionListener {
                     } else {
                         // Sonderfall: Bot hat das Spiel begonnen (erster Zug wurde zurückgenommen)
                         // Dann muss der Bot jetzt neu ziehen
-                        checkAndPerformBotMove();
+                        pruefeUndMacheBotZug();
                     }
                 }
 
@@ -121,42 +136,42 @@ public class SpielGUI extends JPanel implements ActionListener {
                     brettPanel.repaint();
                 }
                 pruefeSpielStatus();
-                
+
                 // Timer fortsetzen, falls er gestoppt war (und Zeitlimit aktiv ist)
-                if (gameTimer != null && !gameTimer.isRunning() && zeitWeiss != -1 && zeitWeiss > 0 && zeitSchwarz > 0) {
-                    gameTimer.start();
+                if (spielTimer != null && !spielTimer.isRunning() && zeitWeiss != -1 && zeitWeiss > 0 && zeitSchwarz > 0) {
+                    spielTimer.start();
                 }
             }
         });
 
-        menuContainer.add(menuBtn);
+        menueContainer.add(menueKnopf);
         if (!(spielerWeiss.istBot() && spielerSchwarz.istBot())) {
-            menuContainer.add(undoBtn);
+            menueContainer.add(undoKnopf);
         }
-        leftPanel.add(menuContainer, BorderLayout.NORTH);
+        leftPanel.add(menueContainer, BorderLayout.NORTH);
 
         // Status Label unten links
-        statusLabel = new JLabel("", SwingConstants.CENTER);
-        statusLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
-        statusLabel.setBorder(BorderFactory.createEmptyBorder(20, 10, 20, 10));
-        leftPanel.add(statusLabel, BorderLayout.SOUTH);
+        statusAnzeige = new JLabel("", SwingConstants.CENTER);
+        statusAnzeige.setFont(new Font("SansSerif", Font.BOLD, 16));
+        statusAnzeige.setBorder(BorderFactory.createEmptyBorder(20, 10, 20, 10));
+        leftPanel.add(statusAnzeige, BorderLayout.SOUTH);
 
         add(leftPanel, BorderLayout.WEST);
         add(rightPanel, BorderLayout.EAST);
 
-        JPanel mainContainer = new JPanel(new GridBagLayout());
-        mainContainer.setBackground(Color.LIGHT_GRAY);
+        JPanel hauptContainer = new JPanel(new GridBagLayout());
+        hauptContainer.setBackground(Color.LIGHT_GRAY);
 
-        boardLayeredPane = new JLayeredPane();
+        brettEbenenPanel = new JLayeredPane();
 
 
         brettPanel.setBorder(BorderFactory.createLineBorder(Color.BLACK));
-        boardLayeredPane.add(brettPanel, JLayeredPane.DEFAULT_LAYER);
+        brettEbenenPanel.add(brettPanel, JLayeredPane.DEFAULT_LAYER);
 
         // Bauer umwandlung Auswahl über dem Brett
-        promotionPanel = new JPanel(new GridLayout(4, 1));
-        promotionPanel.setVisible(false);
-        boardLayeredPane.add(promotionPanel, JLayeredPane.POPUP_LAYER);
+        umwandlungsPanel = new JPanel(new GridLayout(4, 1));
+        umwandlungsPanel.setVisible(false);
+        brettEbenenPanel.add(umwandlungsPanel, JLayeredPane.POPUP_LAYER);
 
         for (int zeile = 8 - 1; zeile >= 0; zeile--) {
             for (int spalte = 0; spalte < 8; spalte++) {
@@ -221,10 +236,11 @@ public class SpielGUI extends JPanel implements ActionListener {
             }
         }
 
-        mainContainer.add(boardLayeredPane);
-        add(mainContainer, BorderLayout.CENTER);
+        hauptContainer.add(brettEbenenPanel);
+        add(hauptContainer, BorderLayout.CENTER);
 
         // Stellt sicher, das das Brett quadratisch bleibt
+        // und passt die Schriftgröße der Figuren dynamisch an.
         addComponentListener(new ComponentAdapter() {
             @Override
             public void componentResized(ComponentEvent e) {
@@ -234,14 +250,14 @@ public class SpielGUI extends JPanel implements ActionListener {
                 int minSize = Math.min(availableWidth, availableHeight) - 50;
                 if (minSize <= 0) return;
 
-                boardLayeredPane.setPreferredSize(new Dimension(minSize, minSize));
+                brettEbenenPanel.setPreferredSize(new Dimension(minSize, minSize));
                 brettPanel.setBounds(0, 0, minSize, minSize);
 
-                if (isPromoting) {
-                    promoAuswahlGroesseAnpassen(minSize);
+                if (istAmUmwandeln) {
+                    passeUmwandlungsGroesseAn(minSize);
                 }
-                
-                boardLayeredPane.revalidate();
+
+                brettEbenenPanel.revalidate();
 
                 int fontSize = (int) ((minSize / 8.0) * 0.6); // Faktor weiter verringert
                 Font font = new Font("SansSerif", Font.PLAIN, Math.max(1, fontSize));
@@ -252,19 +268,20 @@ public class SpielGUI extends JPanel implements ActionListener {
                     }
                 }
 
-                for (Component c : promotionPanel.getComponents()) {
+                for (Component c : umwandlungsPanel.getComponents()) {
                     c.setFont(font);
                 }
             }
         });
 
         aktualisiereBrett();
-        startTimer();
+        starteTimer();
 
         // Falls Weiß ein Bot ist, muss er direkt anfangen
-        checkAndPerformBotMove();
+        pruefeUndMacheBotZug();
     }
 
+    // Zeichnet alle Figuren basierend auf dem internen `brett`-Objekt neu.
     private void aktualisiereBrett() {
         for (int zeile = 0; zeile < 8; zeile++) {
             for (int spalte = 0; spalte < 8; spalte++) {
@@ -283,14 +300,17 @@ public class SpielGUI extends JPanel implements ActionListener {
         }
     }
 
+    /**
+     * Die zentrale Methode, die auf alle Klicks auf dem Schachbrett reagiert.
+     * Sie unterscheidet, ob eine Figur ausgewählt oder ein Zug gemacht wird.
+     */
     @Override
     public void actionPerformed(ActionEvent e) {
-        if (spielBeendet) return;
-        if (isPromoting) return;
+        if (spielBeendet || istAmUmwandeln) return;
 
         // Wenn ein Bot am Zug ist, darf der Mensch nicht klicken
         Spieler aktuellerSpieler = (amZug == Figur.Farbe.WEISS) ? spielerWeiss : spielerSchwarz;
-        if (aktuellerSpieler.istBot()) return;
+        if (aktuellerSpieler.istBot() && !spielBeendet) return;
 
         Object source = e.getSource();
         for (int zeile = 0; zeile < 8; zeile++) {
@@ -307,32 +327,32 @@ public class SpielGUI extends JPanel implements ActionListener {
                             brettPanel.repaint();
                         }
                     } else {
-                        if (brett.istZugGueltig(vonZeile, vonSpalte, zeile, spalte)) {
-                            // Bauernumwandlung?
-                            boolean istBauer = ausgewaehlteFigur instanceof Bauer;
-                            boolean zielIstEndreihe = (zeile == 0 || zeile == 7);
+                        // Bauernumwandlung?
+                        boolean istBauer = ausgewaehlteFigur instanceof Bauer;
+                        boolean zielIstEndreihe = (zeile == 0 || zeile == 7);
 
-                            brett.bewegeFigur(vonZeile, vonSpalte, zeile, spalte);
+                        if (istBauer && zielIstEndreihe && brett.istZugGueltig(vonZeile, vonSpalte, zeile, spalte)) {
+                            // Zug ist eine Promotion -> noch nicht ausführen, erst Auswahl anzeigen
+                            istAmUmwandeln = true;
 
-                            if (istBauer && zielIstEndreihe) {
-                                isPromoting = true;
-
-                                if ((vonZeile + vonSpalte) % 2 == 0) {
-                                    felder[vonZeile][vonSpalte].setBackground(Color.LIGHT_GRAY);
-                                } else {
-                                    felder[vonZeile][vonSpalte].setBackground(Color.WHITE);
-                                }
-                                moeglicheZuege.clear();
-                                ausgewaehlteFigur = null;
-                                aktualisiereBrett();
-                                
-                                zeigePromotionAuswahl(zeile, spalte);
-                                return;
+                            // GUI zurücksetzen, da wir hier abbrechen und auf die Auswahl warten
+                            if ((vonZeile + vonSpalte) % 2 == 0) {
+                                felder[vonZeile][vonSpalte].setBackground(Color.LIGHT_GRAY);
+                            } else {
+                                felder[vonZeile][vonSpalte].setBackground(Color.WHITE);
                             }
+                            moeglicheZuege.clear();
+                            ausgewaehlteFigur = null;
+                            brettPanel.repaint();
 
+                            zeigeUmwandlungsAuswahl(vonZeile, vonSpalte, zeile, spalte);
+                            return;
+                        } else if (brett.istZugGueltig(vonZeile, vonSpalte, zeile, spalte)) {
+                            // Normaler Zug
+                            brett.bewegeFigur(vonZeile, vonSpalte, zeile, spalte);
                             amZug = (amZug == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS;
                             pruefeSpielStatus();
-                            if (!spielBeendet) checkAndPerformBotMove(); // Prüfen, ob jetzt ein Bot dran ist
+                            if (!spielBeendet) pruefeUndMacheBotZug(); // Prüfen, ob jetzt ein Bot dran ist
                         }
                         ausgewaehlteFigur = null;
                         if ((vonZeile + vonSpalte) % 2 == 0) {
@@ -350,7 +370,8 @@ public class SpielGUI extends JPanel implements ActionListener {
         }
     }
 
-    private void promoAuswahlGroesseAnpassen(int boardSize) {
+    // Passt die Größe des Umwandlungs-Popups an die aktuelle Brettgröße an.
+    private void passeUmwandlungsGroesseAn(int boardSize) {
         Insets insets = brettPanel.getInsets();
         int availableWidth = boardSize - insets.left - insets.right;
         int availableHeight = boardSize - insets.top - insets.bottom;
@@ -358,10 +379,10 @@ public class SpielGUI extends JPanel implements ActionListener {
         int fieldWidth = availableWidth / 8;
         int fieldHeight = availableHeight / 8;
 
-        int xPos = insets.left + promotionSpalte * fieldWidth;
+        int xPos = insets.left + umwandlungsSpalte * fieldWidth;
         int yPos;
 
-        // Weiß zieht zur Array-Zeile 7 (Visuell Oben -> y=0). Menü geht nach unten.
+        // Weiß zieht zur Array-Zeile 7 (Visuell Oben -> y=0). Menue geht nach unten.
         // Schwarz zieht zur Array-Zeile 0 (Visuell Unten -> y=boardHeight). Menü geht nach oben.
         
         if (amZug == Figur.Farbe.WEISS) {
@@ -369,20 +390,20 @@ public class SpielGUI extends JPanel implements ActionListener {
             yPos = insets.top;
         } else {
             // Schwarz ist am Zug, Ziel ist unten (Visuell Zeile 7)
-            // Menü soll 4 Felder hoch sein und bei Zeile 7 enden.
+            // Menue soll 4 Felder hoch sein und bei Zeile 7 enden.
             // Start y = (7 * fieldHeight) - (3 * fieldHeight) = 4 * fieldHeight
             yPos = insets.top + 4 * fieldHeight;
         }
 
-        promotionPanel.setBounds(xPos, yPos, fieldWidth, 4 * fieldHeight);
+        umwandlungsPanel.setBounds(xPos, yPos, fieldWidth, 4 * fieldHeight);
     }
 
-    private void zeigePromotionAuswahl(int zeile, int spalte) {
-        promotionZeile = zeile;
-        promotionSpalte = spalte;
-        promotionPanel.removeAll();
+    // Zeigt das Auswahlmenü für die Bauernumwandlung an der richtigen Position an.
+    private void zeigeUmwandlungsAuswahl(int vonZeile, int vonSpalte, int nachZeile, int nachSpalte) {
+        umwandlungsZeile = nachZeile;
+        umwandlungsSpalte = nachSpalte;
+        umwandlungsPanel.removeAll();
 
-        String[] typen = {"Dame", "Turm", "Läufer", "Springer"};
         String[] symbole = new String[4];
         
         // Symbole dynamisch von den Klassen holen
@@ -391,16 +412,18 @@ public class SpielGUI extends JPanel implements ActionListener {
         symbole[2] = new Laeufer(amZug).getFigurIcon();
         symbole[3] = new Springer(amZug).getFigurIcon();
 
-        // Reihenfolge anpassen:
-        // Weiß (oben): Dame, Turm, Läufer, Springer (nach unten)
+        // Reihenfolge anpassen
+        // Weiß (oben): Dame, Turm, Laeufer, Springer (nach unten)
         // Schwarz (unten): Springer, Läufer, Turm, Dame (nach oben, damit Dame auf dem Ziel-Feld liegt)
         boolean isWhite = (amZug == Figur.Farbe.WEISS);
         int start = isWhite ? 0 : 3;
         int end = isWhite ? 4 : -1;
         int step = isWhite ? 1 : -1;
 
+        int[] promoTypIndices = {0, 1, 2, 3}; // Dame, Turm, Läufer, Springer
+
         for (int i = start; i != end; i += step) {
-            String typ = typen[i];
+            int promoTypIndex = promoTypIndices[i];
             JButton btn = new JButton(symbole[i]);
             // Schriftgröße vom aktuellen Brett übernehmen
             btn.setFont(felder[0][0].getFont());
@@ -410,58 +433,66 @@ public class SpielGUI extends JPanel implements ActionListener {
             btn.setBackground(Color.WHITE);
             
             btn.addActionListener(e -> {
-                brett.promoviereBauer(zeile, spalte, typ);
-                promotionPanel.setVisible(false); // Panel wieder verstecken
-                isPromoting = false; // Brett wieder freigeben
+                brett.bewegeFigur(vonZeile, vonSpalte, nachZeile, nachSpalte, 1, promoTypIndex);
+                umwandlungsPanel.setVisible(false); // Panel wieder verstecken
+                istAmUmwandeln = false; // Brett wieder freigeben
                 amZug = (amZug == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS;
                 aktualisiereBrett();
-                pruefeSpielStatus();
-                if (!spielBeendet) checkAndPerformBotMove(); // Nach Promotion könnte ein Bot dran sein
+                pruefeSpielStatus(); // This was missing
+                if (!spielBeendet) pruefeUndMacheBotZug(); // Nach Promotion könnte ein Bot dran sein
             });
-            promotionPanel.add(btn);
+            umwandlungsPanel.add(btn);
         }
 
-        promoAuswahlGroesseAnpassen(brettPanel.getWidth());
-        promotionPanel.setVisible(true);
+        passeUmwandlungsGroesseAn(brettPanel.getWidth());
+        umwandlungsPanel.setVisible(true);
     }
 
-    private JLabel createTimerLabel() {
-        String text = (zeitWeiss == -1) ? "" : formatZeit(zeitWeiss);
+    // Erstellt ein Label für die Zeitanzeige.
+    private JLabel erstelleTimerAnzeige() {
+        String text = (zeitWeiss == -1) ? "" : formatiereZeit(zeitWeiss);
         JLabel label = new JLabel(text, SwingConstants.CENTER);
         label.setFont(new Font("SansSerif", Font.BOLD, 24));
         label.setBorder(BorderFactory.createEmptyBorder(20, 0, 20, 0));
         return label;
     }
 
-    private void startTimer() {
+    // Startet den Spiel-Timer, der jede Sekunde die Zeit des aktiven Spielers reduziert.
+    private void starteTimer() {
         if (zeitWeiss == -1) return;
-        gameTimer = new Timer(1000, e -> {
+        spielTimer = new Timer(1000, e -> {
             if (amZug == Figur.Farbe.WEISS) {
                 zeitWeiss--;
-                timerWeissLabel.setText(formatZeit(zeitWeiss));
+                timerAnzeigeWeiss.setText(formatiereZeit(zeitWeiss));
             } else {
                 zeitSchwarz--;
-                timerSchwarzLabel.setText(formatZeit(zeitSchwarz));
+                timerAnzeigeSchwarz.setText(formatiereZeit(zeitSchwarz));
             }
             
             if (zeitWeiss <= 0 || zeitSchwarz <= 0) {
-                gameTimer.stop();
+                spielTimer.stop();
                 spielBeendet = true;
                 String msg = (zeitWeiss <= 0) ? "Zeit abgelaufen: Weiß hat verloren" : "Zeit abgelaufen: Schwarz hat verloren";
-                statusLabel.setText("<html><center>" + msg + "</center></html>");
+                statusAnzeige.setText("<html><center>" + msg + "</center></html>");
                 SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, msg));
             }
         });
-        gameTimer.start();
+        spielTimer.start();
     }
 
-    private String formatZeit(int sekunden) {
+    // Formatiert die verbleibenden Sekunden in das "MM:SS"-Format.
+    private String formatiereZeit(int sekunden) {
         int min = sekunden / 60;
         int sek = sekunden % 60;
         return String.format("%02d:%02d", min, sek);
     }
 
-    private void checkAndPerformBotMove() {
+    /**
+     * Prüft, ob der aktuelle Spieler ein Bot ist.
+     * Wenn ja, wird die Zugberechnung in einem separaten Thread gestartet,
+     * um ein Einfrieren der GUI zu verhindern.
+     */
+    private void pruefeUndMacheBotZug() {
         Spieler aktuellerSpieler = (amZug == Figur.Farbe.WEISS) ? spielerWeiss : spielerSchwarz;
 
         if (aktuellerSpieler.istBot() && aktuellerSpieler instanceof BotSpieler) {
@@ -490,18 +521,22 @@ public class SpielGUI extends JPanel implements ActionListener {
                         pruefeSpielStatus();
                         
                         // Rekursiver Aufruf, falls Bot vs Bot
-                        if (!spielBeendet) checkAndPerformBotMove();
+                        if (!spielBeendet) pruefeUndMacheBotZug();
                     }
                 });
             }).start();
         }
     }
 
+    /**
+     * Prüft nach jedem Zug den Spielstatus.
+     * Aktualisiert die "Schach"-Anzeige oder zeigt ein Popup bei Spielende (Matt, Patt, Remis).
+     */
     private void pruefeSpielStatus() {
         int status = brett.getSchachmatt();
         if (status != 0) {
             spielBeendet = true;
-            if (gameTimer != null) gameTimer.stop();
+            if (spielTimer != null) spielTimer.stop();
 
             String nachricht = "";
             if (status == -1) nachricht = "Schachmatt: Weiß hat gewonnen";
@@ -509,7 +544,7 @@ public class SpielGUI extends JPanel implements ActionListener {
             else if (status == -2 || status == 2) nachricht = "Patt: Unentschieden";
             else if (status == 3) nachricht = "Remis: Zu wenig Material";
 
-            statusLabel.setText("<html><center>" + nachricht + "</center></html>");
+            statusAnzeige.setText("<html><center>" + nachricht + "</center></html>");
             String finalNachricht = nachricht;
             SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, finalNachricht));
         } else {
@@ -517,11 +552,11 @@ public class SpielGUI extends JPanel implements ActionListener {
             boolean schwarzImSchach = brett.istKoenigBedroht(Figur.Farbe.SCHWARZ);
 
             if (weissImSchach) {
-                statusLabel.setText("<html><center>Weiß<br>im Schach</center></html>");
+                statusAnzeige.setText("<html><center>Weiß<br>im Schach</center></html>");
             } else if (schwarzImSchach) {
-                statusLabel.setText("<html><center>Schwarz<br>im Schach</center></html>");
+                statusAnzeige.setText("<html><center>Schwarz<br>im Schach</center></html>");
             } else {
-                statusLabel.setText("");
+                statusAnzeige.setText("");
             }
         }
     }

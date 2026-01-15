@@ -2,29 +2,47 @@ package Spiel;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.function.BiConsumer;
 
+/**
+ * Das Hauptfenster der Anwendung.
+ * Es verwendet ein CardLayout, um zwischen verschiedenen Ansichten
+ * (Hauptmenü, Einstellungen, Spieler-Auswahl) zu wechseln.
+ */
 public class MainMenu extends JFrame {
 
-    private CardLayout cardLayout;
-    private JPanel mainContainer;
+    private CardLayout kartenLayout;
+    private JPanel hauptContainer;
     private int spielZeit = 600; // Standard 10 Minuten
 
+    // Der Konstruktor baut das Fenster auf und fügt alle "Karten" (Panels) hinzu.
     public MainMenu() {
         setTitle("Schach Spiel Java");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(800, 500); // Fenster größer machen für das Spiel
         setLocationRelativeTo(null); // Fenster zentrieren
 
-        cardLayout = new CardLayout();
-        mainContainer = new JPanel(cardLayout);
+        kartenLayout = new CardLayout();
+        hauptContainer = new JPanel(kartenLayout);
 
-        mainContainer.add(createMenuPanel(), "Menu");
-        mainContainer.add(createSettingsPanel(), "Settings");
+        // Callback-Funktion, die von den Auswahl-Panels aufgerufen wird, um das Spiel zu starten
+        BiConsumer<Spieler, Spieler> startAktion = (weiss, schwarz) -> {
+            hauptContainer.add(new SpielGUI(() -> kartenLayout.show(hauptContainer, "Menu"), spielZeit, weiss, schwarz), "Spiel");
+            kartenLayout.show(hauptContainer, "Spiel");
+        };
+        Runnable zurueckAktion = () -> kartenLayout.show(hauptContainer, "Menu");
 
-        add(mainContainer);
+        // Panels erstellen und als Karten hinzufügen
+        hauptContainer.add(erstelleMenuePanel(startAktion), "Menu");
+        hauptContainer.add(erstelleEinstellungsPanel(), "Settings");
+        hauptContainer.add(new SpielerAuswahlPanel(zurueckAktion, startAktion, true), "PvB_Select");
+        hauptContainer.add(new SpielerAuswahlPanel(zurueckAktion, startAktion, false), "BvB_Select");
+
+        add(hauptContainer);
     }
 
-    private JPanel createMenuPanel() {
+    // Erstellt das Panel für den Hauptmenü-Bildschirm mit den Spielmodus-Buttons.
+    private JPanel erstelleMenuePanel(BiConsumer<Spieler, Spieler> startAktion) {
         // Hauptpanel mit vertikalem Layout (BoxLayout)
         JPanel menuPanel = new JPanel();
         menuPanel.setLayout(new BoxLayout(menuPanel, BoxLayout.Y_AXIS));
@@ -39,50 +57,44 @@ public class MainMenu extends JFrame {
         menuPanel.add(Box.createRigidArea(new Dimension(0, 40))); // Abstand nach unten
 
         // 2. Buttons erstellen
-        JButton botVsSpielerBtn = createButton("Bot vs Spieler");
-        JButton spielerVsSpielerBtn = createButton("Spieler vs Spieler");
-        JButton botVsBotBtn = createButton("Bot vs Bot");
-        JButton einstellungenBtn = createButton("Einstellungen");
+        JButton botVsSpielerKnopf = erstelleKnopf("Bot vs Spieler");
+        JButton spielerVsSpielerKnopf = erstelleKnopf("Spieler vs Spieler");
+        JButton botVsBotKnopf = erstelleKnopf("Bot vs Bot");
+        JButton einstellungenKnopf = erstelleKnopf("Einstellungen");
 
         // Bot vs Spieler (Mensch ist Weiß, Bot ist Schwarz)
-        botVsSpielerBtn.addActionListener(e -> {
-            Spieler weiss = new MenschSpieler(Figur.Farbe.WEISS);
-            Spieler schwarz = new ersterBotSpieler(Figur.Farbe.SCHWARZ);
-            mainContainer.add(new SpielGUI(() -> cardLayout.show(mainContainer, "Menu"), spielZeit, weiss, schwarz), "Spiel");
-            cardLayout.show(mainContainer, "Spiel");
+        botVsSpielerKnopf.addActionListener(e -> {
+            kartenLayout.show(hauptContainer, "PvB_Select");
         });
 
         // Spieler vs Spieler
-        spielerVsSpielerBtn.addActionListener(e -> {
+        spielerVsSpielerKnopf.addActionListener(e -> {
             Spieler weiss = new MenschSpieler(Figur.Farbe.WEISS);
             Spieler schwarz = new MenschSpieler(Figur.Farbe.SCHWARZ);
-            mainContainer.add(new SpielGUI(() -> cardLayout.show(mainContainer, "Menu"), spielZeit, weiss, schwarz), "Spiel");
-            cardLayout.show(mainContainer, "Spiel");
+            startAktion.accept(weiss, schwarz);
         });
 
         // Bot vs Bot
-        botVsBotBtn.addActionListener(e -> {
-            Spieler weiss = new ersterBotSpieler(Figur.Farbe.WEISS);
-            Spieler schwarz = new RandomBotSpieler(Figur.Farbe.SCHWARZ);
-            mainContainer.add(new SpielGUI(() -> cardLayout.show(mainContainer, "Menu"), spielZeit, weiss, schwarz), "Spiel");
-            cardLayout.show(mainContainer, "Spiel");
+        botVsBotKnopf.addActionListener(e -> {
+            kartenLayout.show(hauptContainer, "BvB_Select");
         });
 
-        einstellungenBtn.addActionListener(e -> cardLayout.show(mainContainer, "Settings"));
+        einstellungenKnopf.addActionListener(e -> kartenLayout.show(hauptContainer, "Settings"));
 
         // Buttons zum Panel hinzufügen (mit Abständen)
-        menuPanel.add(botVsSpielerBtn);
+        menuPanel.add(botVsSpielerKnopf);
         menuPanel.add(Box.createRigidArea(new Dimension(0, 15)));
-        menuPanel.add(spielerVsSpielerBtn);
+        menuPanel.add(spielerVsSpielerKnopf);
         menuPanel.add(Box.createRigidArea(new Dimension(0, 15)));
-        menuPanel.add(botVsBotBtn);
+        menuPanel.add(botVsBotKnopf);
         menuPanel.add(Box.createRigidArea(new Dimension(0, 15)));
-        menuPanel.add(einstellungenBtn);
+        menuPanel.add(einstellungenKnopf);
 
         return menuPanel;
     }
 
-    private JButton createButton(String text) {
+    // Eine kleine Hilfsmethode, um Buttons mit einheitlichem Stil zu erstellen.
+    private JButton erstelleKnopf(String text) {
         JButton button = new JButton(text);
         button.setFocusPainted(false); // Entfernt den Rahmen beim Anklicken
         button.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -90,7 +102,8 @@ public class MainMenu extends JFrame {
         return button;
     }
 
-    private JPanel createSettingsPanel() {
+    // Erstellt das Panel für den Einstellungs-Bildschirm (aktuell nur für die Zeitwahl).
+    private JPanel erstelleEinstellungsPanel() {
         JPanel settingsPanel = new JPanel();
         settingsPanel.setLayout(new BoxLayout(settingsPanel, BoxLayout.Y_AXIS));
         settingsPanel.setBorder(BorderFactory.createEmptyBorder(30, 50, 30, 50));
@@ -99,16 +112,16 @@ public class MainMenu extends JFrame {
         titleLabel.setFont(new Font("SansSerif", Font.BOLD, 24));
         titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         
-        JLabel timeLabel = new JLabel("Zeitlimit pro Spieler:");
-        timeLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        JLabel zeitAnzeige = new JLabel("Zeitlimit pro Spieler:");
+        zeitAnzeige.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        String[] timeOptions = {"03:00", "05:00", "10:00", "30:00", "1h", "Kein Zeitlimit"};
-        JComboBox<String> timeDropdown = new JComboBox<>(timeOptions);
-        timeDropdown.setMaximumSize(new Dimension(200, 30));
-        timeDropdown.setSelectedIndex(2); // Default 10:00
+        String[] zeitOptionen = {"03:00", "05:00", "10:00", "30:00", "1h", "Kein Zeitlimit"};
+        JComboBox<String> zeitAuswahl = new JComboBox<>(zeitOptionen);
+        zeitAuswahl.setMaximumSize(new Dimension(200, 30));
+        zeitAuswahl.setSelectedIndex(2); // Default 10:00
         
-        timeDropdown.addActionListener(e -> {
-            String selected = (String) timeDropdown.getSelectedItem();
+        zeitAuswahl.addActionListener(e -> {
+            String selected = (String) zeitAuswahl.getSelectedItem();
             switch (selected) {
                 case "03:00": spielZeit = 180; break;
                 case "05:00": spielZeit = 300; break;
@@ -119,16 +132,16 @@ public class MainMenu extends JFrame {
             }
         });
 
-        JButton backBtn = createButton("Zurück");
-        backBtn.addActionListener(e -> cardLayout.show(mainContainer, "Menu"));
+        JButton zurueckKnopf = erstelleKnopf("Zurück");
+        zurueckKnopf.addActionListener(e -> kartenLayout.show(hauptContainer, "Menu"));
 
         settingsPanel.add(titleLabel);
         settingsPanel.add(Box.createRigidArea(new Dimension(0, 30)));
-        settingsPanel.add(timeLabel);
+        settingsPanel.add(zeitAnzeige);
         settingsPanel.add(Box.createRigidArea(new Dimension(0, 10)));
-        settingsPanel.add(timeDropdown);
+        settingsPanel.add(zeitAuswahl);
         settingsPanel.add(Box.createRigidArea(new Dimension(0, 30)));
-        settingsPanel.add(backBtn);
+        settingsPanel.add(zurueckKnopf);
 
         return settingsPanel;
     }

@@ -1,6 +1,6 @@
 package Spiel;
 
-public abstract class Figur {
+public abstract class Figur implements Cloneable {
 
     private final Farbe farbe;
     private boolean hatSichBewegt = false;
@@ -46,6 +46,15 @@ public abstract class Figur {
 
     public void setHatSichBewegt(boolean hatSichBewegt) {
         this.hatSichBewegt = hatSichBewegt;
+    }
+
+    @Override
+    public Figur clone() {
+        try {
+            return (Figur) super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public enum Farbe {

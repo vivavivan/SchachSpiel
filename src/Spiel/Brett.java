@@ -2,38 +2,93 @@ package Spiel;
 
 import java.util.ArrayList;
 
+/**
+ * Die zentrale Logik-Klasse des Spiels.
+ * Sie verwaltet das Schachbrett, die Figuren und die Spielregeln.
+ */
 public class Brett {
 
+    // Das 8x8-Gitter, das die Positionen aller Figuren speichert.
     private final Figur[][] felder = new Figur[8][8];
-    private final ZugRegister zugRegister = new ZugRegister();
+    private ZugRegister zugRegister = new ZugRegister();
+    private boolean istKopie = false;
 
+    // Speichert die Positionen der Könige für schnellen Zugriff bei der Schach-Prüfung.
     private final int[] posKoenigWeiss = new int[2];
     private final int[] posKoenigSchwarz = new int[2];
 
+    // Listen, um schnell auf alle Figuren einer Farbe zugreifen zu können (wichtig für Bots und Spielende-Prüfung).
     private final ArrayList<Figur> weisseFiguren = new ArrayList<>();
     private final ArrayList<Figur> schwarzeFiguren = new ArrayList<>();
 
     private int enPassantMoeglich = -1;
-    //-2 für Schwarz im patt, -1 für schwarz im matt, 0 für nichts, 1 für weiss im matt, 2 für weiss im patt, 3 für Remie
+    // Speichert den Spielstatus: 0 = läuft, +/-1 = Matt, +/-2 = Patt, 3 = Remis.
     private int schachMatt = 0;
 
+    // Standard-Konstruktor für ein neues Spiel.
     public Brett() {
-        initialisiereBrett();
+        this(false);
     }
 
+    public Brett(Boolean istKopie) {
+        this.istKopie = istKopie;
+        if (!this.istKopie) {
+            initialisiereBrett();
+        }
+    }
+
+    /**
+     * Erstellt eine komplette, unabhängige Kopie des aktuellen Bretts.
+     * Unverzichtbar für den Bot, damit er Züge simulieren kann, ohne das echte Spiel zu beeinflussen.
+     */
+    public Brett erstelleKopie() {
+        Brett kopie = new Brett(true); // Leeres Brett erstellen
+
+        // Relevante Werte kopieren
+        kopie.enPassantMoeglich = this.enPassantMoeglich;
+        kopie.schachMatt = this.schachMatt;
+        System.arraycopy(this.posKoenigWeiss, 0, kopie.posKoenigWeiss, 0, 2);
+        System.arraycopy(this.posKoenigSchwarz, 0, kopie.posKoenigSchwarz, 0, 2);
+
+        // ZugRegister kopieren
+        kopie.zugRegister = this.zugRegister.kopie();
+
+        // Figuren reinmachen
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+                if (this.felder[i][j] != null) {
+                    Figur original = this.felder[i][j];
+                    Figur klon = original.clone();
+                    kopie.platzieren(klon, i, j); // Fügt Figur in Array und Listen ein
+                }
+            }
+        }
+
+        return kopie;
+    }
+
+    // Gibt die Figur auf einem bestimmten Feld zurück, oder null, wenn es leer ist.
     public Figur getFigur(int zeile, int spalte) {
         return felder[zeile][spalte];
     }
 
 
+    /**
+     * Führt einen einfachen Zug aus (ohne Bauernumwandlung).
+     */
     public void bewegeFigur(int vonZeile, int vonSpalte, int nachZeile, int nachSpalte) {
         bewegeFigur(felder, vonZeile, vonSpalte, nachZeile, nachSpalte, 0, 0);
     }
 
+    /**
+     * Führt einen Zug aus und berücksichtigt dabei eine mögliche Bauernumwandlung.
+     */
     public void bewegeFigur(int vonZeile, int vonSpalte, int nachZeile, int nachSpalte, int istPromotion, int promotionTyp) {
         bewegeFigur(felder, vonZeile, vonSpalte, nachZeile, nachSpalte, istPromotion, promotionTyp);
     }
 
+    // Die eigentliche Logik, um eine Figur zu bewegen.
+    // Sie aktualisiert das Brett, die Figurenlisten und registriert den Zug für die Undo-Funktion.
     private void bewegeFigur(Figur[][] felder, int vonZeile, int vonSpalte, int nachZeile, int nachSpalte, int istPromotion, int promotionTyp) {
         Figur figur = felder[vonZeile][vonSpalte];
         if (figur == null) return; // Sicherheitscheck gegen NPE
@@ -46,7 +101,7 @@ public class Brett {
 
         // Schlagzug: Gegnerische Figur aus Liste entfernen
         if (felder[nachZeile][nachSpalte] != null) {
-            geschlageneFigurTyp = getFigurTypID(felder[nachZeile][nachSpalte]);
+            geschlageneFigurTyp = gibFigurTypID(felder[nachZeile][nachSpalte]);
             hatOpferSichBewegt = felder[nachZeile][nachSpalte].hatSichBewegt();
             gegnerFiguren.remove(felder[nachZeile][nachSpalte]);
         }
@@ -86,7 +141,7 @@ public class Brett {
         figur.setSpalte(nachSpalte);
 
         if (figur instanceof Koenig) {
-            setKoenigPos(figur.getFarbe(), nachZeile, nachSpalte);
+            setzeKoenigPos(figur.getFarbe(), nachZeile, nachSpalte);
         }
 
         if(istPromotion == 1) {
@@ -102,15 +157,19 @@ public class Brett {
 
         }
 
-        wirdEnPassantMoeglich(figur, vonZeile, vonSpalte, nachZeile, nachSpalte);
+        setzeEnPassantMoeglichkeit(figur, vonZeile, vonSpalte, nachZeile, nachSpalte);
 
         if (figur != null) figur.setHatSichBewegt(true);
 
-        zugRegister.registerZug(vonZeile, vonSpalte, nachZeile, nachSpalte, istPromotion, promotionTyp, enPassantGeschlagenSpalte, geschlageneFigurTyp, warErsterZug, hatOpferSichBewegt);
+        zugRegister.registriereZug(vonZeile, vonSpalte, nachZeile, nachSpalte, istPromotion, promotionTyp, enPassantGeschlagenSpalte, geschlageneFigurTyp, warErsterZug, hatOpferSichBewegt);
 
         spielZuende(gegnerFarbe);
     }
 
+    /**
+     * Tauscht einen Bauern, der die gegnerische Grundlinie erreicht hat,
+     * gegen eine andere Figur (Dame, Turm, etc.) aus.
+     */
     public void promoviereBauer(int zeile, int spalte, String neuerTyp) {
         Figur bauer = felder[zeile][spalte];
         if (bauer == null || !(bauer instanceof Bauer)) return;
@@ -141,14 +200,18 @@ public class Brett {
         spielZuende((farbe == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS);
     }
 
+    /**
+     * Macht den letzten Zug rückgängig.
+     * Stellt geschlagene Figuren wieder her und setzt den "hatSichBewegt"-Status zurück.
+     */
     public boolean undo() {
-        int letzterZug = zugRegister.undo();
+        int letzterZug = zugRegister.gibLetztenZug();
         if (letzterZug == -1) return false;
 
         int startFeld = letzterZug & 0x3F;
         int zielFeld = (letzterZug >> 6) & 0x3F;
         int istPromotion = (letzterZug >> 12) & 1;
-        int enPassant = ((letzterZug >> 15) & 15) - 1; // Maske auf 15 (4 Bits) erhöht
+        int enPassant = ((letzterZug >> 15) & 15) - 1;
         int geschlageneTyp = (letzterZug >> 19) & 7;
         boolean warErsterZug = ((letzterZug >> 22) & 1) == 1;
         boolean hatOpferSichBewegt = ((letzterZug >> 23) & 1) == 1;
@@ -158,7 +221,6 @@ public class Brett {
         int nachZeile = zielFeld >> 3;
         int nachSpalte = zielFeld & 7;
 
-        // Die Figur steht aktuell auf dem Zielfeld!
         Figur figur = felder[nachZeile][nachSpalte];
         if (figur == null) return false;
 
@@ -180,7 +242,7 @@ public class Brett {
 
         // Königsposition aktualisieren
         if (figur instanceof Koenig) {
-            setKoenigPos(figur.getFarbe(), vonZeile, vonSpalte);
+            setzeKoenigPos(figur.getFarbe(), vonZeile, vonSpalte);
         }
 
         // Rochade rückgängig machen (Turm zurückstellen)
@@ -205,18 +267,15 @@ public class Brett {
             opfer.setHatSichBewegt(hatOpferSichBewegt);
         } else if (geschlageneTyp > 0) {
             Figur.Farbe gegnerFarbe = (figur.getFarbe() == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS;
-            Figur opfer = erzeugeFigurAusTyp(geschlageneTyp, gegnerFarbe);
+            Figur opfer = erzeugeFigurNachTyp(geschlageneTyp, gegnerFarbe);
             platzieren(opfer, nachZeile, nachSpalte);
-            // Wir wissen nicht genau, ob sie sich bewegt hat, aber meistens ja, wenn sie mitten auf dem Brett geschlagen wurde.
-            // Für Rochade-Rechte des Gegners wäre das wichtig, aber das ist komplexer.
-            opfer.setHatSichBewegt(true);
             opfer.setHatSichBewegt(hatOpferSichBewegt);
         }
-
+        if(!istKopie) spielZuende(figur.getFarbe());
         return true;
     }
 
-    private int getFigurTypID(Figur f) {
+    private int gibFigurTypID(Figur f) {
         if (f instanceof Bauer) return 1;
         if (f instanceof Turm) return 2;
         if (f instanceof Springer) return 3;
@@ -225,7 +284,7 @@ public class Brett {
         return 6; // König
     }
 
-    private Figur erzeugeFigurAusTyp(int typ, Figur.Farbe farbe) {
+    private Figur erzeugeFigurNachTyp(int typ, Figur.Farbe farbe) {
         switch (typ) {
             case 1: return new Bauer(farbe);
             case 2: return new Turm(farbe);
@@ -236,11 +295,16 @@ public class Brett {
         }
     }
 
+    /**
+     * Die wichtigste Methode zur Zugvalidierung.
+     * Prüft, ob ein Zug "pseudo-legal" ist (also den Bewegungsregeln der Figur entspricht)
+     * und simuliert ihn dann, um zu sehen, ob der eigene König danach im Schach stehen würde.
+     */
     public boolean istZugGueltig(int vonZeile, int vonSpalte, int nachZeile, int nachSpalte) {
         Figur ziehendeFigur = felder[vonZeile][vonSpalte];
         if (ziehendeFigur == null) return false;
 
-        if (!zugLogik(vonZeile, vonSpalte, nachZeile, nachSpalte)) return false;
+        if (!istPseudoLegal(vonZeile, vonSpalte, nachZeile, nachSpalte)) return false;
 
         // --- Simulation Start ---
         Figur originalZiel = felder[nachZeile][nachSpalte];
@@ -255,7 +319,7 @@ public class Brett {
         ziehendeFigur.setSpalte(nachSpalte);
 
         if (ziehendeFigur instanceof Koenig) {
-            setKoenigPos(ziehendeFigur.getFarbe(), nachZeile, nachSpalte);
+            setzeKoenigPos(ziehendeFigur.getFarbe(), nachZeile, nachSpalte);
         }
 
         // Schlagzug simulieren (Figur aus Liste entfernen)
@@ -275,7 +339,7 @@ public class Brett {
         boolean stehtImSchach = istKoenigBedroht(ziehendeFigur.getFarbe());
 
         if (ziehendeFigur instanceof Koenig) {
-            setKoenigPos(ziehendeFigur.getFarbe(), vonZeile, vonSpalte);
+            setzeKoenigPos(ziehendeFigur.getFarbe(), vonZeile, vonSpalte);
         }
 
         // Zug rückgängig machen
@@ -295,7 +359,11 @@ public class Brett {
         return !stehtImSchach;
     }
 
-    public boolean zugLogik(int vonZeile, int vonSpalte, int nachZeile, int nachSpalte) {
+    /**
+     * Prüft, ob ein Zug den reinen Bewegungsregeln einer Figur entspricht (ohne Schach-Prüfung).
+     * Das ist eine schnelle Vorab-Prüfung.
+     */
+    public boolean istPseudoLegal(int vonZeile, int vonSpalte, int nachZeile, int nachSpalte) {
         Figur figur = getFigur(vonZeile, vonSpalte);
         if (figur == null) {
             return false;
@@ -326,7 +394,7 @@ public class Brett {
         } else if (figur instanceof Koenigin) {
             return istKoeniginZugGueltig(vonZeile, vonSpalte, nachZeile, nachSpalte);
         } else if (figur instanceof Koenig) {
-            return istKoenigZugGueltig(vonZeile, vonSpalte, nachZeile, nachSpalte);
+            return istKoenigPseudoLegal(vonZeile, vonSpalte, nachZeile, nachSpalte);
         }
 
         return false;
@@ -335,7 +403,7 @@ public class Brett {
     private boolean hatKeineLegalenZuege(Figur.Farbe farbe) {
         ArrayList<Figur> figuren = (farbe == Figur.Farbe.WEISS) ? weisseFiguren : schwarzeFiguren;
 
-        for (Figur f : figuren) {
+        for (Figur f : new ArrayList<>(figuren)) {
             int vonZeile = f.getZeile();
             int vonSpalte = f.getSpalte();
 
@@ -351,8 +419,12 @@ public class Brett {
         return true;
     }
     
+    /**
+     * Prüft, ob das Spiel zu Ende ist (Schachmatt, Patt oder Remis)
+     * und setzt die `schachMatt`-Variable entsprechend.
+     */
     public boolean spielZuende(Figur.Farbe koenigfarbe) {
-        if(hatZuWenigMaterial()) {
+        if(istRemisWegenMaterialmangel()) {
             schachMatt = 3;
             return true;
         }
@@ -367,7 +439,7 @@ public class Brett {
         return false;
     }
 
-    private boolean hatZuWenigMaterial() {
+    private boolean istRemisWegenMaterialmangel() {
         int weisseSpringer = 0;
         int schwarzeSpringer = 0;
 
@@ -399,15 +471,10 @@ public class Brett {
         }
 
         // Fall C: König und Läufer gegen König und Läufer (K+L vs K+L)
-        // Nur Remis, wenn beide Läufer auf der gleichen Feldfarbe stehen
         if (weisseFiguren.size() == 2 && schwarzeFiguren.size() == 2) {
             return true;
         }
-
-        if (gesamt == 4 && weisseSpringer == 1 && schwarzeSpringer == 1) {
-            return true;
-        }
-
+        
         if (gesamt == 4 && (weisseSpringer == 2 || schwarzeSpringer == 2)) {
             return true;
         }
@@ -415,7 +482,11 @@ public class Brett {
         return false;
     }
 
-    private boolean istFeldBedroht(int zeile, int spalte, Figur.Farbe eigeneFarbe) {
+    /**
+     * Prüft, ob ein bestimmtes Feld von einer gegnerischen Figur angegriffen wird.
+     * Wichtig für die Schach-Prüfung und die Rochade.
+     */
+    public boolean istFeldBedroht(int zeile, int spalte, Figur.Farbe eigeneFarbe) {
         Figur.Farbe gegnerFarbe = (eigeneFarbe == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS;
 
         // 1. Bauern prüfen
@@ -491,16 +562,18 @@ public class Brett {
         return false;
     }
 
+    // Findet schnell die Position eines Königs über die gespeicherten Koordinaten.
     public int[] findeKoenig(Figur.Farbe farbe) {
         return (farbe == Figur.Farbe.WEISS) ? posKoenigWeiss : posKoenigSchwarz;
     }
 
+    // Prüft, ob der König einer bestimmten Farbe im Schach steht.
     public boolean istKoenigBedroht(Figur.Farbe eigeneFarbe) {
         int[] koenig = findeKoenig(eigeneFarbe);
         return istFeldBedroht(koenig[0], koenig[1], eigeneFarbe);
     }
 
-    private void wirdEnPassantMoeglich(Figur figur, int vonZeile, int vonSpalte, int nachZeile, int nachSpalte) {
+    private void setzeEnPassantMoeglichkeit(Figur figur, int vonZeile, int vonSpalte, int nachZeile, int nachSpalte) {
 
         enPassantMoeglich = -1;
 
@@ -516,14 +589,17 @@ public class Brett {
         }
     }
 
+    // Getter für die Figurenliste von Schwarz.
     public ArrayList<Figur> getSchwarzeFiguren() {
         return schwarzeFiguren;
     }
 
+    // Getter für die Figurenliste von Weiß.
     public ArrayList<Figur> getWeisseFiguren() {
         return weisseFiguren;
     }
 
+    // Prüft, ob die gegebenen Koordinaten innerhalb des 8x8-Bretts liegen.
     private boolean istImBrett(int zeile, int spalte) {
         return zeile >= 0 && zeile < 8 && spalte >= 0 && spalte < 8;
     }
@@ -617,7 +693,7 @@ public class Brett {
         return istTurmZugGueltig(vonZeile, vonSpalte, nachZeile, nachSpalte) || istLaeuferZugGueltig(vonZeile, vonSpalte, nachZeile, nachSpalte);
     }
 
-    private boolean istKoenigZugGueltig(int vonZeile, int vonSpalte, int nachZeile, int nachSpalte) {
+    private boolean istKoenigPseudoLegal(int vonZeile, int vonSpalte, int nachZeile, int nachSpalte) {
         int zeilenDiff = Math.abs(vonZeile - nachZeile);
         int spaltenDiff = Math.abs(vonSpalte - nachSpalte);
 
@@ -626,13 +702,13 @@ public class Brett {
         }
 
         if (zeilenDiff == 0 && spaltenDiff == 2) {
-            return rochade(vonZeile, vonSpalte, nachZeile, nachSpalte);
+            return istRochadeGueltig(vonZeile, vonSpalte, nachZeile, nachSpalte);
         }
 
         return false;
     }
 
-    private boolean rochade(int vonZeile, int vonSpalte, int nachZeile, int nachSpalte) {
+    private boolean istRochadeGueltig(int vonZeile, int vonSpalte, int nachZeile, int nachSpalte) {
         int richtung = (vonSpalte < nachSpalte) ? 1 : -1;
         int turmSpalte = (vonSpalte < nachSpalte) ? 7 : 0;
 
@@ -656,11 +732,13 @@ public class Brett {
         return true;
     }
 
+    // Gibt den aktuellen Spielstatus zurück (0=läuft, +/-1=Matt, etc.).
     public int getSchachmatt() {
         return schachMatt;
     }
 
-    private void setKoenigPos(Figur.Farbe farbe, int zeile, int spalte) {
+    // Aktualisiert die gespeicherte Position eines Königs.
+    private void setzeKoenigPos(Figur.Farbe farbe, int zeile, int spalte) {
         if (farbe == Figur.Farbe.WEISS) {
             posKoenigWeiss[0] = zeile;
             posKoenigWeiss[1] = spalte;
@@ -670,6 +748,7 @@ public class Brett {
         }
     }
 
+    // Eine Hilfsmethode, um eine Figur auf dem Brett zu platzieren und sie den Listen hinzuzufügen.
     private void platzieren(Figur figur, int zeile, int spalte) {
         figur.setZeile(zeile);
         figur.setSpalte(spalte);
@@ -681,6 +760,10 @@ public class Brett {
         }
     }
 
+    /**
+     * Generiert eine Liste aller pseudo-legalen Züge für eine Figur auf einem Feld.
+     * Diese Züge müssen danach noch mit `istZugGueltig` auf Schach-Sicherheit geprüft werden.
+     */
     public ArrayList<int[]> getLegaleZuege(int zeile, int spalte) {
         Figur figur = getFigur(zeile, spalte);
         if (figur == null) return new ArrayList<>();
@@ -718,6 +801,7 @@ public class Brett {
         return moeglicheFelder;
     }
 
+    // Scannt in geraden oder diagonalen Linien nach möglichen Zügen (für Turm, Läufer, Dame).
     private void scanRichtungen(int zeile, int spalte, int[][] richtungen, ArrayList<int[]> liste) {
         for (int[] r : richtungen) {
             for (int i = 1; i < 8; i++) {
@@ -732,12 +816,14 @@ public class Brett {
         }
     }
 
+    // Prüft, ob ein Zug gültig ist und fügt ihn ggf. einer Liste hinzu.
     private void pruefenUndHinzufuegen(int vonZeile, int vonSpalte, int nachZeile, int nachSpalte, ArrayList<int[]> liste) {
         if (istZugGueltig(vonZeile, vonSpalte, nachZeile, nachSpalte)) {
             liste.add(new int[]{nachZeile, nachSpalte});
         }
     }
 
+    // Stellt alle Figuren in ihre Startpositionen und initialisiert die Listen.
     private void initialisiereBrett() {
         weisseFiguren.clear();
         schwarzeFiguren.clear();
