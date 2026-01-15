@@ -233,37 +233,37 @@ public class BesserAlsStockFishBot extends BotSpieler {
                     if (f instanceof Bauer) {
                         wert += 100;
                         if (feldBedroht && !feldGedeckt) wert -= 50;
-                        int feld = (farbe == Figur.Farbe.WEISS) ? ((z << 3) | s ): ((s << 3) | z);
+                        int feld = (farbe == Figur.Farbe.WEISS) ? ((z << 3) | s ): 65 - ((z << 3) | s);
                         wert += BAUER_PST[feld];
                     }
                     else if (f instanceof Springer) {
                         wert += 300;
                         if (feldBedroht && !feldGedeckt) wert -= 200;
-                        int feld = (farbe == Figur.Farbe.WEISS) ? ((z << 3) | s ): ((s << 3) | z);
+                        int feld = (farbe == Figur.Farbe.WEISS) ? ((z << 3) | s ): 63 - ((z << 3) | s);
                         wert += SPRINGER_PST[feld];
                     }
                     else if (f instanceof Laeufer) {
                         wert += 300;
                         if (feldBedroht && !feldGedeckt) wert -= 200;
-                        int feld = (farbe == Figur.Farbe.WEISS) ? ((z << 3) | s ): ((s << 3) | z);
+                        int feld = (farbe == Figur.Farbe.WEISS) ? ((z << 3) | s ): 63 - ((z << 3) | s);
                         wert += LAEUFER_PST[feld];
                     }
                     else if (f instanceof Turm) {
                         wert += 500;
                         if (feldBedroht && !feldGedeckt) wert -= 400;
-                        int feld = (farbe == Figur.Farbe.WEISS) ? ((z << 3) | s ): ((s << 3) | z);
+                        int feld = (farbe == Figur.Farbe.WEISS) ? ((z << 3) | s ): 63 - ((z << 3) | s);
                         wert += TURM_PST[feld];
                     }
                     else if (f instanceof Koenigin) {
                         wert += 900;
                         if (feldBedroht && !feldGedeckt) wert -= 700;
-                        int feld = (farbe == Figur.Farbe.WEISS) ? ((z << 3) | s ): ((s << 3) | z);
+                        int feld = (farbe == Figur.Farbe.WEISS) ? ((z << 3) | s ): 63 - ((z << 3) | s);
                         wert += KOENIGIN_PST[feld];
                     }
                     else if (f instanceof Koenig) {
                         wert += 10000;
                         if (feldBedroht) wert -= 50;
-                        int feld = (farbe == Figur.Farbe.WEISS) ? ((z << 3) | s ): ((s << 3) | z);
+                        int feld = (farbe == Figur.Farbe.WEISS) ? ((z << 3) | s ): 63 - ((z << 3) | s);
                         if(farbe == Figur.Farbe.WEISS) {
                             if (brett.getWeisseFiguren().size() > 5) {
                                 wert += KOENIG_MIDDLEGAME_PST[feld];
