@@ -17,18 +17,18 @@ import java.util.List;
  */
 public class SpielGUI extends JPanel implements ActionListener {
 
-    // --- GUI-Komponenten ---
+    // GUI-Komponenten
     private final JPanel brettPanel;
     private final JButton[][] felder = new JButton[8][8];
-    private final JPanel leftPanel;
-    private final JPanel rightPanel;
+    private final JPanel linkesPanel;
+    private final JPanel rechtesPanel;
     private final JLayeredPane brettEbenenPanel;
     private final JPanel umwandlungsPanel;
     private JLabel statusAnzeige;
     private JLabel timerAnzeigeWeiss;
     private JLabel timerAnzeigeSchwarz;
 
-    // --- Spiel-Logik & Status ---
+    // Spiel-Logik und Status
     private final Brett brett;
     private boolean istAmUmwandeln = false;
     private int umwandlungsZeile = -1;
@@ -36,16 +36,17 @@ public class SpielGUI extends JPanel implements ActionListener {
     private List<int[]> moeglicheZuege = new ArrayList<>();
     private boolean spielBeendet = false;
 
+    // ausgewaehlteFigur speichert den "ersten Klick" auf dem Brett
     private Figur ausgewaehlteFigur;
     private int vonZeile = -1;
     private int vonSpalte = -1;
     private Figur.Farbe amZug = Figur.Farbe.WEISS;
     
-    private int zeitWeiss = 600; // 10 Minuten in Sekunden
+    private int zeitWeiss = 600; // 10 Minuten in Sekunden standard
     private int zeitSchwarz = 600;
     private Timer spielTimer;
 
-    // Die beiden Spieler (können Mensch oder Bot sein).
+    // Spieler Auswahl
     private final Spieler spielerWeiss;
     private final Spieler spielerSchwarz;
 
@@ -65,30 +66,28 @@ public class SpielGUI extends JPanel implements ActionListener {
         this.spielerWeiss = spielerWeiss;
         this.spielerSchwarz = spielerSchwarz;
 
-        // --- Aufbau der GUI-Struktur ---
+        // Platzhalter für das Schachbrett
         brettPanel = new JPanel(new GridLayout(8, 8));
 
         //Seiten-Panels erstellen
-        leftPanel = new JPanel(new BorderLayout());
-        leftPanel.setPreferredSize(new Dimension(180, 0));
-        leftPanel.setBackground(Color.LIGHT_GRAY);
+        linkesPanel = new JPanel(new BorderLayout());
+        linkesPanel.setPreferredSize(new Dimension(180, 0));
+        linkesPanel.setBackground(Color.LIGHT_GRAY);
 
-        rightPanel = new JPanel();
-        rightPanel.setPreferredSize(new Dimension(180, 0));
-        rightPanel.setBackground(Color.LIGHT_GRAY);
-        rightPanel.setLayout(new BorderLayout());
+        rechtesPanel = new JPanel();
+        rechtesPanel.setPreferredSize(new Dimension(180, 0));
+        rechtesPanel.setBackground(Color.LIGHT_GRAY);
+        rechtesPanel.setLayout(new BorderLayout());
 
         timerAnzeigeSchwarz = erstelleTimerAnzeige();
-        rightPanel.add(timerAnzeigeSchwarz, BorderLayout.NORTH);
+        rechtesPanel.add(timerAnzeigeSchwarz, BorderLayout.NORTH);
 
         timerAnzeigeWeiss = erstelleTimerAnzeige();
-        rightPanel.add(timerAnzeigeWeiss, BorderLayout.SOUTH);
+        rechtesPanel.add(timerAnzeigeWeiss, BorderLayout.SOUTH);
 
-        // Menü-Button Container (damit er oben links bleibt)
         JPanel menueContainer = new JPanel(new FlowLayout(FlowLayout.LEFT));
         menueContainer.setOpaque(false);
 
-        // Menü-Button (Hamburger-Icon)
         JButton menueKnopf = new JButton("\u2190");
         menueKnopf.setFont(new Font("SansSerif", Font.PLAIN, 24));
         menueKnopf.setFocusPainted(false);
@@ -113,9 +112,7 @@ public class SpielGUI extends JPanel implements ActionListener {
                 amZug = (amZug == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS;
                 spielBeendet = false; // Spiel wieder aufnehmen
 
-                // Speziallogik für Mensch vs. Bot:
-                // Wenn wir gegen einen Bot spielen, müssen wir ZWEI Züge zurückgehen,
-                // damit wir wieder dran sind.
+                // Bei Mensch gegen Bot muss 2 Züge zurück gemacht werden
                 Spieler jetzigerSpieler = (amZug == Figur.Farbe.WEISS) ? spielerWeiss : spielerSchwarz;
                 Spieler andererSpieler = (amZug == Figur.Farbe.WEISS) ? spielerSchwarz : spielerWeiss;
 
@@ -123,7 +120,7 @@ public class SpielGUI extends JPanel implements ActionListener {
                     if (brett.undo()) {
                         amZug = (amZug == Figur.Farbe.WEISS) ? Figur.Farbe.SCHWARZ : Figur.Farbe.WEISS;
                     } else {
-                        // Sonderfall: Bot hat das Spiel begonnen (erster Zug wurde zurückgenommen)
+                        // Sonderfall: Bot hat das Spiel begonnen
                         // Dann muss der Bot jetzt neu ziehen
                         pruefeUndMacheBotZug();
                     }
@@ -137,7 +134,7 @@ public class SpielGUI extends JPanel implements ActionListener {
                 }
                 pruefeSpielStatus();
 
-                // Timer fortsetzen, falls er gestoppt war (und Zeitlimit aktiv ist)
+                // Timer fortsetzen falls er gestoppt war
                 if (spielTimer != null && !spielTimer.isRunning() && zeitWeiss != -1 && zeitWeiss > 0 && zeitSchwarz > 0) {
                     spielTimer.start();
                 }
@@ -148,16 +145,16 @@ public class SpielGUI extends JPanel implements ActionListener {
         if (!(spielerWeiss.istBot() && spielerSchwarz.istBot())) {
             menueContainer.add(undoKnopf);
         }
-        leftPanel.add(menueContainer, BorderLayout.NORTH);
+        linkesPanel.add(menueContainer, BorderLayout.NORTH);
 
         // Status Label unten links
         statusAnzeige = new JLabel("", SwingConstants.CENTER);
         statusAnzeige.setFont(new Font("SansSerif", Font.BOLD, 16));
         statusAnzeige.setBorder(BorderFactory.createEmptyBorder(20, 10, 20, 10));
-        leftPanel.add(statusAnzeige, BorderLayout.SOUTH);
+        linkesPanel.add(statusAnzeige, BorderLayout.SOUTH);
 
-        add(leftPanel, BorderLayout.WEST);
-        add(rightPanel, BorderLayout.EAST);
+        add(linkesPanel, BorderLayout.WEST);
+        add(rechtesPanel, BorderLayout.EAST);
 
         JPanel hauptContainer = new JPanel(new GridBagLayout());
         hauptContainer.setBackground(Color.LIGHT_GRAY);
@@ -244,7 +241,7 @@ public class SpielGUI extends JPanel implements ActionListener {
         addComponentListener(new ComponentAdapter() {
             @Override
             public void componentResized(ComponentEvent e) {
-                int availableWidth = getWidth() - leftPanel.getPreferredSize().width - rightPanel.getPreferredSize().width;
+                int availableWidth = getWidth() - linkesPanel.getPreferredSize().width - rechtesPanel.getPreferredSize().width;
                 int availableHeight = getHeight();
 
                 int minSize = Math.min(availableWidth, availableHeight) - 50;
@@ -259,7 +256,7 @@ public class SpielGUI extends JPanel implements ActionListener {
 
                 brettEbenenPanel.revalidate();
 
-                int fontSize = (int) ((minSize / 8.0) * 0.6); // Faktor weiter verringert
+                int fontSize = (int) ((minSize / 8.0) * 0.6);
                 Font font = new Font("SansSerif", Font.PLAIN, Math.max(1, fontSize));
 
                 for (int zeile = 0; zeile < 8; zeile++) {
@@ -303,6 +300,7 @@ public class SpielGUI extends JPanel implements ActionListener {
     /**
      * Die zentrale Methode, die auf alle Klicks auf dem Schachbrett reagiert.
      * Sie unterscheidet, ob eine Figur ausgewählt oder ein Zug gemacht wird.
+     * @param e welches Feld wurde angeclickt
      */
     @Override
     public void actionPerformed(ActionEvent e) {
@@ -316,6 +314,7 @@ public class SpielGUI extends JPanel implements ActionListener {
         for (int zeile = 0; zeile < 8; zeile++) {
             for (int spalte = 0; spalte < 8; spalte++) {
                 if (source == felder[zeile][spalte]) {
+                    // Welche Figur wurde beim ersten Klick ausgewählt
                     if (ausgewaehlteFigur == null) {
                         Figur figur = brett.getFigur(zeile, spalte);
                         if (figur != null && figur.getFarbe() == amZug) {
@@ -326,6 +325,7 @@ public class SpielGUI extends JPanel implements ActionListener {
                             moeglicheZuege = brett.getLegaleZuege(zeile, spalte);
                             brettPanel.repaint();
                         }
+                    // Wenn eine Figur schon augewählt wurde, wird geschaut wohin sie bewegt werden soll
                     } else {
                         // Bauernumwandlung?
                         boolean istBauer = ausgewaehlteFigur instanceof Bauer;
@@ -335,7 +335,6 @@ public class SpielGUI extends JPanel implements ActionListener {
                             // Zug ist eine Promotion -> noch nicht ausführen, erst Auswahl anzeigen
                             istAmUmwandeln = true;
 
-                            // GUI zurücksetzen, da wir hier abbrechen und auf die Auswahl warten
                             if ((vonZeile + vonSpalte) % 2 == 0) {
                                 felder[vonZeile][vonSpalte].setBackground(Color.LIGHT_GRAY);
                             } else {
@@ -376,26 +375,20 @@ public class SpielGUI extends JPanel implements ActionListener {
         int availableWidth = boardSize - insets.left - insets.right;
         int availableHeight = boardSize - insets.top - insets.bottom;
 
-        int fieldWidth = availableWidth / 8;
-        int fieldHeight = availableHeight / 8;
+        int felderBreite = availableWidth / 8;
+        int felderHoehe = availableHeight / 8;
 
-        int xPos = insets.left + umwandlungsSpalte * fieldWidth;
+        int xPos = insets.left + umwandlungsSpalte * felderBreite;
         int yPos;
 
-        // Weiß zieht zur Array-Zeile 7 (Visuell Oben -> y=0). Menue geht nach unten.
-        // Schwarz zieht zur Array-Zeile 0 (Visuell Unten -> y=boardHeight). Menü geht nach oben.
-        
         if (amZug == Figur.Farbe.WEISS) {
             // Weiß ist am Zug (hat gerade gezogen), Ziel ist oben
             yPos = insets.top;
         } else {
-            // Schwarz ist am Zug, Ziel ist unten (Visuell Zeile 7)
-            // Menue soll 4 Felder hoch sein und bei Zeile 7 enden.
-            // Start y = (7 * fieldHeight) - (3 * fieldHeight) = 4 * fieldHeight
-            yPos = insets.top + 4 * fieldHeight;
+            yPos = insets.top + 4 * felderHoehe;
         }
 
-        umwandlungsPanel.setBounds(xPos, yPos, fieldWidth, 4 * fieldHeight);
+        umwandlungsPanel.setBounds(xPos, yPos, felderBreite, 4 * felderHoehe);
     }
 
     // Zeigt das Auswahlmenü für die Bauernumwandlung an der richtigen Position an.
@@ -405,16 +398,12 @@ public class SpielGUI extends JPanel implements ActionListener {
         umwandlungsPanel.removeAll();
 
         String[] symbole = new String[4];
-        
-        // Symbole dynamisch von den Klassen holen
+
         symbole[0] = new Koenigin(amZug).getFigurIcon();
         symbole[1] = new Turm(amZug).getFigurIcon();
         symbole[2] = new Laeufer(amZug).getFigurIcon();
         symbole[3] = new Springer(amZug).getFigurIcon();
 
-        // Reihenfolge anpassen
-        // Weiß (oben): Dame, Turm, Laeufer, Springer (nach unten)
-        // Schwarz (unten): Springer, Läufer, Turm, Dame (nach oben, damit Dame auf dem Ziel-Feld liegt)
         boolean isWhite = (amZug == Figur.Farbe.WEISS);
         int start = isWhite ? 0 : 3;
         int end = isWhite ? 4 : -1;
@@ -472,9 +461,9 @@ public class SpielGUI extends JPanel implements ActionListener {
             if (zeitWeiss <= 0 || zeitSchwarz <= 0) {
                 spielTimer.stop();
                 spielBeendet = true;
-                String msg = (zeitWeiss <= 0) ? "Zeit abgelaufen: Weiß hat verloren" : "Zeit abgelaufen: Schwarz hat verloren";
-                statusAnzeige.setText("<html><center>" + msg + "</center></html>");
-                SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, msg));
+                String Nachricht = (zeitWeiss <= 0) ? "Zeit abgelaufen: Weiß hat verloren" : "Zeit abgelaufen: Schwarz hat verloren";
+                statusAnzeige.setText("<html><center>" + Nachricht + "</center></html>");
+                SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(this, Nachricht));
             }
         });
         spielTimer.start();
@@ -490,7 +479,7 @@ public class SpielGUI extends JPanel implements ActionListener {
     /**
      * Prüft, ob der aktuelle Spieler ein Bot ist.
      * Wenn ja, wird die Zugberechnung in einem separaten Thread gestartet,
-     * um ein Einfrieren der GUI zu verhindern.
+     * um ein Einfrieren vom GUI zu verhindern.
      */
     private void pruefeUndMacheBotZug() {
         Spieler aktuellerSpieler = (amZug == Figur.Farbe.WEISS) ? spielerWeiss : spielerSchwarz;
@@ -498,7 +487,7 @@ public class SpielGUI extends JPanel implements ActionListener {
         if (aktuellerSpieler.istBot() && aktuellerSpieler instanceof BotSpieler) {
             BotSpieler bot = (BotSpieler) aktuellerSpieler;
 
-            // Berechnung in einem neuen Thread, damit das GUI nicht einfriert
+            // Berechnung in einem neuen Thread, damit GUI nicht einfriert
             new Thread(() -> {
                 try {
                     // Kurze Verzögerung für besseres Spielgefühl

@@ -15,7 +15,7 @@ public class MainMenu extends JFrame {
     private JPanel hauptContainer;
     private int spielZeit = 600; // Standard 10 Minuten
 
-    // Der Konstruktor baut das Fenster auf und fügt alle "Karten" (Panels) hinzu.
+    // Konstruktor baut das Fenster auf und fügt alle "Karten" hinzu.
     public MainMenu() {
         setTitle("Schach Spiel Java");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -62,7 +62,6 @@ public class MainMenu extends JFrame {
         JButton botVsBotKnopf = erstelleKnopf("Bot vs Bot");
         JButton einstellungenKnopf = erstelleKnopf("Einstellungen");
 
-        // Bot vs Spieler (Mensch ist Weiß, Bot ist Schwarz)
         botVsSpielerKnopf.addActionListener(e -> {
             kartenLayout.show(hauptContainer, "PvB_Select");
         });

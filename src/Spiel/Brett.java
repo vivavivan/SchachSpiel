@@ -304,7 +304,7 @@ public class Brett {
         Figur ziehendeFigur = felder[vonZeile][vonSpalte];
         if (ziehendeFigur == null) return false;
 
-        if (!istPseudoLegal(vonZeile, vonSpalte, nachZeile, nachSpalte)) return false;
+        if (!istZugLegal(vonZeile, vonSpalte, nachZeile, nachSpalte)) return false;
 
         // --- Simulation Start ---
         Figur originalZiel = felder[nachZeile][nachSpalte];
@@ -360,10 +360,9 @@ public class Brett {
     }
 
     /**
-     * Prüft, ob ein Zug den reinen Bewegungsregeln einer Figur entspricht (ohne Schach-Prüfung).
-     * Das ist eine schnelle Vorab-Prüfung.
+     * Prüft, ob ein Zug den reinen Bewegungsregeln einer Figur entspricht (ohne Schach).
      */
-    public boolean istPseudoLegal(int vonZeile, int vonSpalte, int nachZeile, int nachSpalte) {
+    public boolean istZugLegal(int vonZeile, int vonSpalte, int nachZeile, int nachSpalte) {
         Figur figur = getFigur(vonZeile, vonSpalte);
         if (figur == null) {
             return false;
@@ -394,7 +393,7 @@ public class Brett {
         } else if (figur instanceof Koenigin) {
             return istKoeniginZugGueltig(vonZeile, vonSpalte, nachZeile, nachSpalte);
         } else if (figur instanceof Koenig) {
-            return istKoenigPseudoLegal(vonZeile, vonSpalte, nachZeile, nachSpalte);
+            return istKoenigZugLegal(vonZeile, vonSpalte, nachZeile, nachSpalte);
         }
 
         return false;
@@ -562,7 +561,7 @@ public class Brett {
         return false;
     }
 
-    // Findet schnell die Position eines Königs über die gespeicherten Koordinaten.
+    //gibt Position des Koenigs aus
     public int[] findeKoenig(Figur.Farbe farbe) {
         return (farbe == Figur.Farbe.WEISS) ? posKoenigWeiss : posKoenigSchwarz;
     }
@@ -604,6 +603,7 @@ public class Brett {
         return zeile >= 0 && zeile < 8 && spalte >= 0 && spalte < 8;
     }
 
+    // --Hilfsmethoden für istZugLegal methode--
     private boolean istBauerZugGueltig(Bauer bauer, int vonZeile, int vonSpalte, int nachZeile, int nachSpalte) {
         int richtung = (bauer.getFarbe() == Figur.Farbe.WEISS) ? 1 : -1;
 
@@ -693,7 +693,7 @@ public class Brett {
         return istTurmZugGueltig(vonZeile, vonSpalte, nachZeile, nachSpalte) || istLaeuferZugGueltig(vonZeile, vonSpalte, nachZeile, nachSpalte);
     }
 
-    private boolean istKoenigPseudoLegal(int vonZeile, int vonSpalte, int nachZeile, int nachSpalte) {
+    private boolean istKoenigZugLegal(int vonZeile, int vonSpalte, int nachZeile, int nachSpalte) {
         int zeilenDiff = Math.abs(vonZeile - nachZeile);
         int spaltenDiff = Math.abs(vonSpalte - nachSpalte);
 
@@ -731,6 +731,7 @@ public class Brett {
 
         return true;
     }
+    // -------
 
     // Gibt den aktuellen Spielstatus zurück (0=läuft, +/-1=Matt, etc.).
     public int getSchachmatt() {
@@ -761,8 +762,8 @@ public class Brett {
     }
 
     /**
-     * Generiert eine Liste aller pseudo-legalen Züge für eine Figur auf einem Feld.
-     * Diese Züge müssen danach noch mit `istZugGueltig` auf Schach-Sicherheit geprüft werden.
+     * Generiert eine Liste aller legalen Züge für eine Figur auf einem Feld.
+     * Deutlich effizienter als für jede Figur "istZugGueltig()" zu jedem anderen Feld auf dem Brett zu prüfen
      */
     public ArrayList<int[]> getLegaleZuege(int zeile, int spalte) {
         Figur figur = getFigur(zeile, spalte);

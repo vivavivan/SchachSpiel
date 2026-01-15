@@ -1,8 +1,9 @@
 package Spiel;
 
 /**
- * Ein fortgeschrittener Bot, der den Minimax-Algorithmus mit Alpha-Beta-Suche verwendet.
- * Er kann mehrere Züge vorausschauen und spielt dadurch deutlich stärker.
+ * Minimax-Algorithmus + Alpha-Beta-Suche.
+ * Er kann mehrere Züge vorausschauen.
+ * Hat Martin auf Chess.com besiegt
  */
 public class MartinBot extends BotSpieler {
     public MartinBot(Figur.Farbe farbe) {
@@ -29,13 +30,13 @@ public class MartinBot extends BotSpieler {
             dynamischeTiefe = 5;
         }
         System.out.println(dynamischeTiefe);
-        int besterZug = minimaxStart(brettKopie, dynamischeTiefe-1, true);
+        int besterZug = minimaxStart(brettKopie, dynamischeTiefe-1);
         if (besterZug == 0) return null;
         return zugDekodieren(besterZug);
     }
 
     // Start-Funktion für Minimax: Iteriert über alle Züge auf der obersten Ebene.
-    private int minimaxStart(Brett brett, int tiefe, boolean maximiere) {
+    private int minimaxStart(Brett brett, int tiefe) {
         int[] alleZuege = generiereAlleZuege(brett, this.farbe);
 
         // Züge mischen damit der Bot mehr random spielt
@@ -67,13 +68,13 @@ public class MartinBot extends BotSpieler {
      * Die rekursive vom Bot.
      * Simuliert abwechselnd Züge für sich selbst (maximiere) und den Gegner (minimiere).
      */
-    private int minimax(Brett brett, int tiefe, int alpha, int beta, boolean maximiere) {
+    private int minimax(Brett brett, int tiefe, int alpha, int beta, boolean bistDuDran) {
         if (tiefe == 0) {
             return evaluieren(brett, this.farbe);
         }
 
-        // Wir müssen prüfen wer gerade am Zug ist
-        Figur.Farbe aktuelleFarbe = maximiere ? this.farbe : gegenFarbe(this.farbe);
+        // Wer ist gerade am Zug in der Simulation
+        Figur.Farbe aktuelleFarbe = bistDuDran ? this.farbe : gegenFarbe(this.farbe);
         int[] alleZuege = generiereAlleZuege(brett, aktuelleFarbe);
 
         if (alleZuege.length == 0) {
@@ -82,7 +83,7 @@ public class MartinBot extends BotSpieler {
         }
 
         //Zug für uns evaluieren
-        if (maximiere) {
+        if (bistDuDran) {
             int maxEvalualtion = -2000000000;
             for (int zugEncodiert : alleZuege) {
                 int[] zugDecodiert = zugDekodieren(zugEncodiert);

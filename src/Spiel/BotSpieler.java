@@ -62,6 +62,7 @@ public abstract class BotSpieler extends Spieler{
         return Arrays.copyOf(zugSpeicher, anzahl);
     }
 
+    // mischt Züge durch, damit bei "gleicher Evaluation" unterschiedliche Züge gespielt werden
     protected void mischeZuege(int[] zuege) {
         java.util.Random zufall = new java.util.Random();
         for (int i = zuege.length - 1; i > 0; i--) {

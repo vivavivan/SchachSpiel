@@ -28,7 +28,7 @@ public class SpielerAuswahlPanel extends JPanel {
         titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         // --- Optionen für die Dropdowns ---
-        String[] botOptionen = {"Mensch", "Random Bot", "Gieriger Bot", "Martin Bot"};
+        String[] botOptionen = {"Mensch", "Random Bot", "Gieriger Bot", "Martin Bot", "Besser als Stockfish"};
 
         // --- Weißer Spieler ---
         JLabel weissLabel = new JLabel("Weißer Spieler:");
@@ -99,6 +99,7 @@ public class SpielerAuswahlPanel extends JPanel {
             case "Random Bot": return new RandomBotSpieler(farbe);
             case "Gieriger Bot": return new ersterBotSpieler(farbe);
             case "Martin Bot": return new MartinBot(farbe);
+            case "Besser als Stockfish": return new BesserAlsStockFishBot(farbe);
             default: return new MenschSpieler(farbe);
         }
     }
