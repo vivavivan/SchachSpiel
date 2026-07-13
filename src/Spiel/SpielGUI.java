@@ -196,6 +196,8 @@ public class SpielGUI extends JPanel implements ActionListener {
                 felder[zeile][spalte].setFont(new Font("SansSerif", Font.PLAIN, 20));
                 felder[zeile][spalte].setFocusPainted(false); // Entfernt den Rahmen beim Anklicken
                 felder[zeile][spalte].setBorder(null);
+                felder[zeile][spalte].setOpaque(true);
+                felder[zeile][spalte].setBorderPainted(false);
                 felder[zeile][spalte].addMouseListener(new MouseAdapter() {
                     @Override
                     public void mouseEntered(MouseEvent e) {
