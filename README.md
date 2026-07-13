@@ -22,7 +22,7 @@ Ein Schachspiel in Java mit eigener GUI und 4 verschieden starken Bot-Gegnern. D
 
 - **Zughistorie (`ZugRegister.java`)**
   - Für jeden Zug ein eigenes Objekt zu erstellen wäre bei den ganzen Bot-Simulationen und beim Undo zu langsam
-  - Deshalb wird ein Zug (Start, Ziel, Promotion, En Passant, geschlagene Figur) einfach in einen einzigen 32-Bit-Integer gepackt
+  - Deshalb wird ein Zug (Start, Ziel, Promotion, En Passant, geschlagene Figur) einfach in einen einzigen 32-Bit-Integer gepackt - Macht die Bots deutlich effizienter
 
 ---
 
