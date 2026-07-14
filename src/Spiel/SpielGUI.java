@@ -192,7 +192,7 @@ public class SpielGUI extends JPanel implements ActionListener {
                     }
                 };
                 felder[zeile][spalte].setMargin(new Insets(0, 0, 0, 0));
-                felder[zeile][spalte].putClientProperty("JButton.buttonType", "square"); // FlatLaf: Eckige Buttons erzwingen
+                felder[zeile][spalte].putClientProperty("JButton.buttonType", "square"); // Falls FlatLaf aktiviert: Eckige Buttons erzwingen
                 felder[zeile][spalte].setFont(new Font("SansSerif", Font.PLAIN, 20));
                 felder[zeile][spalte].setFocusPainted(false); // Entfernt den Rahmen beim Anklicken
                 felder[zeile][spalte].setBorder(null);
